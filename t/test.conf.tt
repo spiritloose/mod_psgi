@@ -1,0 +1,18 @@
+LoadModule psgi_module modules/mod_psgi.so
+PassEnv PERL5LIB
+[% FOR file = files %]
+<Location [% path %]/[% file %]>
+  SetHandler psgi
+  PSGIApp [% dir %]/[% file %]
+</Location>
+[% END -%]
+
+NameVirtualHost *:[% port %]
+Listen [% port %]
+<VirtualHost *:[% port %]>
+  ServerName plack.test.suite
+  <Location />
+    SetHandler psgi
+    PSGIApp [% dir %]/suite.t
+  </Location>
+</VirtualHost>

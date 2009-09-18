@@ -1,0 +1,39 @@
+This is Apache2 module mod_psgi.
+
+* Install
+
+    % make APX=/usr/local/apache2/bin/apx PERL=/usr/local/bin/perl
+    % make install
+
+Then activate it in Apache's httpd.conf file for instance
+for the URL /psgi in as follows:
+
+    # httpd.conf
+    LoadModule psgi_module modules/mod_psgi.so
+    <Location /psgi>
+      SetHandler psgi
+      PSGIApp /path/to/app.psgi
+    </Location>
+
+Then after restarting Apache via
+
+    $ apachectl restart
+
+* Spec
+
+    * This module works on Apache2 which is configured by '--with-mpm=prefork'.
+
+    * PSGIApp files are loaded by 'do $file'. The file must return a code reference
+    that is a PSGI application.
+
+    * The input stream ($env->{'psgi.input'}) is not seekable.
+    $env->{'psgi.input'}->seek($pos, $whence) raises an error.
+
+* License
+
+See the 'LICENSE' file.
+
+* Author
+
+Jiro Nishiguchi <jiro@cpan.org>
+

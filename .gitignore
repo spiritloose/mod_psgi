@@ -1,0 +1,7 @@
+/ppport.h
+/.libs
+*.la
+*.lo
+*.o
+*.slo
+/t/test.conf
