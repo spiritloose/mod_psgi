@@ -40,6 +40,10 @@ typedef struct {
     char *psgi_app;
 } psgi_dir_config;
 
+static int argc = 0;
+static char *argv[] = { "", NULL };
+static char **envp = NULL;
+
 static void server_error(request_rec *r, const char *fmt, ...)
 {
     va_list argp;
@@ -473,9 +477,6 @@ static void init_perl_variables(request_rec *r)
 
 static int psgi_handler(request_rec *r)
 {
-    int argc = 0;
-    char *argv[] = { "", NULL };
-    char **envp = NULL;
     SV *app, *env, *res;
     PerlInterpreter *my_perl;
     psgi_dir_config *c;
@@ -493,7 +494,6 @@ static int psgi_handler(request_rec *r)
         return DECLINED;
     }
 
-    PERL_SYS_INIT3(&argc, (char ***) argv, &envp);
     my_perl = perl_alloc();
     PL_perl_destruct_level = 1;
     perl_construct(my_perl);
@@ -520,7 +520,6 @@ exit:
     PL_perl_destruct_level = 1;
     perl_destruct(my_perl);
     perl_free(my_perl);
-    PERL_SYS_TERM();
     return rc;
 }
 
@@ -531,10 +530,23 @@ static int supported_mpm()
     return result;
 }
 
+static apr_status_t psgi_child_exit(void *p)
+{
+    PERL_SYS_TERM();
+    return OK;
+}
+
+static void psgi_child_init(apr_pool_t *p, server_rec *s)
+{
+    PERL_SYS_INIT3(&argc, (char ***) argv, &envp);
+    apr_pool_cleanup_register(p, NULL, psgi_child_exit, psgi_child_exit);
+}
+
 static void psgi_register_hooks(apr_pool_t *p)
 {
     if (supported_mpm()) {
         ap_hook_handler(psgi_handler, NULL, NULL, APR_HOOK_MIDDLE);
+        ap_hook_child_init(psgi_child_init, NULL, NULL, APR_HOOK_MIDDLE);
     } else {
         server_error(NULL, "mod_psgi only supports prefork mpm");
     }
