@@ -22,7 +22,6 @@
 #include "ap_mpm.h"
 #include "apr_strings.h"
 
-#define PERL_NO_GET_CONTEXT
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
