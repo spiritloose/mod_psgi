@@ -135,6 +135,7 @@ xs_init(pTHX)
 
 static int copy_env(void *rec, const char *key, const char *val)
 {
+    dTHX;
     HV *env = (HV *) rec;
     hv_store(env, key, strlen(key), newSVpv(val, 0), 0);
     return 1;
@@ -142,6 +143,7 @@ static int copy_env(void *rec, const char *key, const char *val)
 
 static SV *make_env(request_rec *r)
 {
+    dTHX;
     HV *env;
     AV *version;
     char *url_scheme;
@@ -191,6 +193,7 @@ static SV *make_env(request_rec *r)
 
 static SV *load_psgi(request_rec *r, const char *file)
 {
+    dTHX;
     SV *app;
     char *code;
 
@@ -211,6 +214,7 @@ static SV *load_psgi(request_rec *r, const char *file)
 
 static SV *run_app(request_rec *r, SV *app, SV *env)
 {
+    dTHX;
     int count;
     SV *res;
     dSP;
@@ -240,6 +244,7 @@ static SV *run_app(request_rec *r, SV *app, SV *env)
 
 static int output_status(request_rec *r, SV *status)
 {
+    dTHX;
     int s = SvIV(status);
     if (s < 100) {
         server_error(r, "invalid response status %d", s);
@@ -263,6 +268,7 @@ static int check_header_value(const char *value)
 
 static int output_headers(request_rec *r, AV *headers)
 {
+    dTHX;
     SV *key_sv, *val_sv;
     char *key, *val;
     while (av_len(headers) > -1) {
@@ -288,6 +294,7 @@ static int output_headers(request_rec *r, AV *headers)
 
 static int respond_to(SV *obj, const char *method)
 {
+    dTHX;
     int res;
     dSP;
     ENTER;
@@ -315,6 +322,7 @@ static void set_content_length(request_rec *r, apr_off_t length)
 
 static int output_body_ary(request_rec *r, AV *bodys)
 {
+    dTHX;
     SV **body;
     I32 i;
     I32 lastidx;
@@ -337,6 +345,7 @@ static int output_body_ary(request_rec *r, AV *bodys)
 
 static int output_body_obj(request_rec *r, SV *obj, int type)
 {
+    dTHX;
     SV *buf_sv, *rs;
     apr_off_t clen = 0;
     STRLEN len;
@@ -383,6 +392,7 @@ static int output_body_obj(request_rec *r, SV *obj, int type)
 
 static int output_body(request_rec *r, SV *body)
 {
+    dTHX;
     int rc, type;
     switch (type = SvTYPE(SvRV(body))) {
         case SVt_PVAV:
@@ -403,6 +413,7 @@ static int output_body(request_rec *r, SV *body)
 
 static int output_response(request_rec *r, SV *res)
 {
+    dTHX;
     AV *res_av;
     SV **status;
     SV **headers;
@@ -453,6 +464,7 @@ static int output_response(request_rec *r, SV *res)
 
 static void init_perl_variables(request_rec *r)
 {
+    dTHX;
     GV *exit_gv = gv_fetchpv("CORE::GLOBAL::exit", TRUE, SVt_PVCV);
     GvCV(exit_gv) = get_cv("ModPSGI::exit", TRUE);
     GvIMPORTED_CV_on(exit_gv);
@@ -465,28 +477,29 @@ static PerlInterpreter *init_perl(request_rec *r)
     int argc = 0;
     char *argv[] = { "", NULL };
     char **envp = NULL;
-    PerlInterpreter *perlinterp;
+    PerlInterpreter *my_perl;
     PERL_SYS_INIT3(&argc, (char ***) argv, &envp);
-    perlinterp = perl_alloc();
+    my_perl = perl_alloc();
     PL_perl_destruct_level = 1;
-    perl_construct(perlinterp);
-    perl_parse(perlinterp, xs_init, argc, argv, envp);
+    perl_construct(my_perl);
+    perl_parse(my_perl, xs_init, argc, argv, envp);
     PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
-    perl_run(perlinterp);
+    perl_run(my_perl);
     init_perl_variables(r);
-    return perlinterp;
+    return my_perl;
 }
 
-static void *destroy_perl(PerlInterpreter *perlinterp)
+static void *destroy_perl(PerlInterpreter *my_perl)
 {
     PL_perl_destruct_level = 1;
-    perl_destruct(perlinterp);
-    perl_free(perlinterp);
+    perl_destruct(my_perl);
+    perl_free(my_perl);
     PERL_SYS_TERM();
 }
 
 static int psgi_handler(request_rec *r)
 {
+    dTHX;
     SV *app, *env, *res;
     PerlInterpreter *perlinterp;
     psgi_dir_config *c;
