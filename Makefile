@@ -12,8 +12,8 @@ APACHECTL=apachectl
 PERL=perl
 
 builddir=.
-top_srcdir=$(shell $(APXS) -q prefix)
-top_builddir=$(shell $(APXS) -q prefix)
+top_srcdir=$(shell $(APXS) -q exp_datadir)
+top_builddir=$(shell $(APXS) -q exp_datadir)
 include $(shell $(APXS) -q installbuilddir)/special.mk
 
 #   additional defines, includes and libraries
