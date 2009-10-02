@@ -556,7 +556,7 @@ static const char *cmd_psgi_app(cmd_parms *cmd, void *conf, const char *v)
 
 static const command_rec command_table[] = {
     AP_INIT_TAKE1("PSGIApp", cmd_psgi_app, NULL,
-            ACCESS_CONF, "set PSGI application"),
+            OR_LIMIT, "set PSGI application"),
     { NULL }
 };
 
