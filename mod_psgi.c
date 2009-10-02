@@ -472,36 +472,13 @@ static void init_perl_variables(request_rec *r)
     hv_store(GvHV(PL_envgv), "MOD_PSGI", 8, newSVpv(MOD_PSGI_VERSION, 0), 0);
 }
 
-static PerlInterpreter *init_perl(request_rec *r)
+static int psgi_handler(request_rec *r)
 {
     int argc = 0;
     char *argv[] = { "", NULL };
     char **envp = NULL;
-    PerlInterpreter *my_perl;
-    PERL_SYS_INIT3(&argc, (char ***) argv, &envp);
-    my_perl = perl_alloc();
-    PL_perl_destruct_level = 1;
-    perl_construct(my_perl);
-    perl_parse(my_perl, xs_init, argc, argv, envp);
-    PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
-    perl_run(my_perl);
-    init_perl_variables(r);
-    return my_perl;
-}
-
-static void *destroy_perl(PerlInterpreter *my_perl)
-{
-    PL_perl_destruct_level = 1;
-    perl_destruct(my_perl);
-    perl_free(my_perl);
-    PERL_SYS_TERM();
-}
-
-static int psgi_handler(request_rec *r)
-{
-    dTHX;
     SV *app, *env, *res;
-    PerlInterpreter *perlinterp;
+    PerlInterpreter *my_perl;
     psgi_dir_config *c;
     int rc;
 
@@ -517,7 +494,15 @@ static int psgi_handler(request_rec *r)
         return DECLINED;
     }
 
-    perlinterp = init_perl(r);
+    PERL_SYS_INIT3(&argc, (char ***) argv, &envp);
+    my_perl = perl_alloc();
+    PL_perl_destruct_level = 1;
+    perl_construct(my_perl);
+    perl_parse(my_perl, xs_init, argc, argv, envp);
+    PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
+    perl_run(my_perl);
+    init_perl_variables(r);
+
     app = load_psgi(r, c->psgi_app);
     if (app == NULL) {
         rc = HTTP_INTERNAL_SERVER_ERROR;
@@ -533,7 +518,10 @@ static int psgi_handler(request_rec *r)
     rc = output_response(r, res);
     goto exit;
 exit:
-    destroy_perl(perlinterp);
+    PL_perl_destruct_level = 1;
+    perl_destruct(my_perl);
+    perl_free(my_perl);
+    PERL_SYS_TERM();
     return rc;
 }
 
