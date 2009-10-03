@@ -21,6 +21,7 @@
 #include "ap_config.h"
 #include "ap_mpm.h"
 #include "apr_strings.h"
+#include "apr_hash.h"
 
 #include "EXTERN.h"
 #include "perl.h"
@@ -41,7 +42,11 @@ typedef struct {
     SV *app;
 } psgi_dir_config;
 
-static PerlInterpreter *perlinterp;
+static PerlInterpreter *perlinterp = NULL;
+
+static apr_hash_t *app_mapping = NULL;
+
+static apr_array_header_t *psgi_apps = NULL;
 
 static void server_error(request_rec *r, const char *fmt, ...)
 {
@@ -441,31 +446,24 @@ static int psgi_handler(request_rec *r)
 {
     SV *app, *env, *res;
     psgi_dir_config *c;
-    int rc;
 
     if (strcmp(r->handler, "psgi")) {
         return DECLINED;
     }
-
     c = (psgi_dir_config *) ap_get_module_config(r->per_dir_config, &psgi_module);
-
     if (c->file == NULL) {
         ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 0, r->server,
                 "PSGIApp not configured");
         return DECLINED;
     }
-
+    app = apr_hash_get(app_mapping, c->file, APR_HASH_KEY_STRING);
     env = make_env(r);
-    res = run_app(r, c->app, env);
+    res = run_app(r, app, env);
     if (res == NULL) {
         server_error(r, "invalid response");
-        rc = HTTP_INTERNAL_SERVER_ERROR;
-        goto exit;
+        return HTTP_INTERNAL_SERVER_ERROR;
     }
-    rc = output_response(r, res);
-    goto exit;
-exit:
-    return rc;
+    return output_response(r, res);
 }
 
 static int supported_mpm()
@@ -512,15 +510,13 @@ static SV *load_psgi(apr_pool_t *pool, const char *file)
     return app;
 }
 
-static int psgi_pre_configured = 0;
-
-static int psgi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp)
+static apr_status_t
+psgi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp)
 {
     int argc = 2;
     char *argv[] = { "perl", "-e;0", NULL };
     char **envp = NULL;
 
-    if (psgi_pre_configured) return OK;
     PERL_SYS_INIT3(&argc, (char ***) argv, &envp);
     perlinterp = perl_alloc();
     PL_perl_destruct_level = 1;
@@ -529,7 +525,32 @@ static int psgi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptem
     PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
     perl_run(perlinterp);
     init_perl_variables();
-    psgi_pre_configured++;
+
+    psgi_apps = apr_array_make(pconf, 10, sizeof(char *));
+    app_mapping = apr_hash_make(pconf);
+
+    return OK;
+}
+
+static int
+psgi_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
+{
+    dTHX;
+    int i;
+    char *file, **elts;
+    SV *app;
+
+    elts = (char **) psgi_apps->elts;
+    for (i = 0; i < psgi_apps->nelts; i++) {
+        file = elts[i];
+        app = load_psgi(pconf, file);
+        if (app == NULL) {
+            ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL,
+                    "%s had compilation errors.", file);
+            return DONE;
+        }
+        apr_hash_set(app_mapping, file, APR_HASH_KEY_STRING, app);
+    }
     return OK;
 }
 
@@ -537,6 +558,7 @@ static void psgi_register_hooks(apr_pool_t *p)
 {
     if (supported_mpm()) {
         ap_hook_pre_config(psgi_pre_config, NULL, NULL, APR_HOOK_MIDDLE);
+        ap_hook_post_config(psgi_post_config, NULL, NULL, APR_HOOK_MIDDLE);
         ap_hook_child_init(psgi_child_init, NULL, NULL, APR_HOOK_MIDDLE);
         ap_hook_handler(psgi_handler, NULL, NULL, APR_HOOK_MIDDLE);
     } else {
@@ -556,10 +578,7 @@ static const char *cmd_psgi_app(cmd_parms *cmd, void *conf, const char *v)
 {
     psgi_dir_config *c = (psgi_dir_config *) conf;
     c->file = (char *) apr_pstrdup(cmd->pool, v);
-    c->app = load_psgi(cmd->pool, c->file);
-    if (c->app == NULL) {
-        return apr_psprintf(cmd->pool, "%s had compilation errors.", c->file);
-    }
+    *(const char **) apr_array_push(psgi_apps) = c->file;
     return NULL;
 }
 
