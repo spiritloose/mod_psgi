@@ -31,6 +31,8 @@
 #define NEED_sv_2pv_flags
 #include "ppport.h"
 
+#define PSGI_HANDLER_NAME "psgi"
+
 #ifdef DEBUG
 #define TRACE(...) ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 0, NULL, __VA_ARGS__)
 #endif
@@ -447,7 +449,7 @@ static int psgi_handler(request_rec *r)
     SV *app, *env, *res;
     psgi_dir_config *c;
 
-    if (strcmp(r->handler, "psgi")) {
+    if (strcmp(r->handler, PSGI_HANDLER_NAME)) {
         return DECLINED;
     }
     c = (psgi_dir_config *) ap_get_module_config(r->per_dir_config, &psgi_module);
@@ -551,6 +553,9 @@ psgi_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_
         }
         apr_hash_set(app_mapping, file, APR_HASH_KEY_STRING, app);
     }
+
+    ap_add_version_component(pconf, apr_psprintf(pconf, "mod_psgi/%s", MOD_PSGI_VERSION));
+
     return OK;
 }
 
