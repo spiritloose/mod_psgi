@@ -2,8 +2,11 @@ This is Apache2 module mod_psgi.
 
 * Install
 
-    % make APX=/usr/local/apache2/bin/apx PERL=/usr/local/bin/perl
-    % make install
+Just type 'make' and 'make install'.
+You can specify apxs and perl as follows:
+
+    % make APXS=/usr/local/apache2/bin/apxs PERL=/usr/local/bin/perl
+    % sudo make APXS=/usr/local/apache2/bin/apxs PERL=/usr/local/bin/perl install
 
 Then activate it in Apache's httpd.conf file for instance
 for the URL /psgi in as follows:
@@ -23,8 +26,8 @@ Then after restarting Apache via
 
     * This module works on Apache2 which is configured by '--with-mpm=prefork'.
 
-    * PSGIApp files are loaded by 'do $file'. The file must return a code reference
-    that is a PSGI application.
+    * PSGIApp files are loaded by 'do $file' at the time of startup parent process.
+    The file must return a code reference that is a PSGI application.
 
     * The input stream ($env->{'psgi.input'}) is not seekable.
     $env->{'psgi.input'}->seek($pos, $whence) raises an error.
