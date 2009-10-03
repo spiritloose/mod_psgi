@@ -548,7 +548,15 @@ psgi_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_
     int i;
     char *file, **elts;
     SV *app;
+    void *data;
+    const char *userdata_key = "psgi_post_config";
 
+    apr_pool_userdata_get(&data, userdata_key, s->process->pool);
+    if (data == NULL) {
+        apr_pool_userdata_set((const void *)1, userdata_key,
+                apr_pool_cleanup_null, s->process->pool);
+        return OK;
+    }
     elts = (char **) psgi_apps->elts;
     for (i = 0; i < psgi_apps->nelts; i++) {
         file = elts[i];
