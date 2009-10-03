@@ -41,7 +41,6 @@ module AP_MODULE_DECLARE_DATA psgi_module;
 
 typedef struct {
     char *file;
-    SV *app;
 } psgi_dir_config;
 
 static PerlInterpreter *perlinterp = NULL;
@@ -444,6 +443,28 @@ static void init_perl_variables()
     hv_store(GvHV(PL_envgv), "MOD_PSGI", 8, newSVpv(MOD_PSGI_VERSION, 0), 0);
 }
 
+static SV *load_psgi(apr_pool_t *pool, const char *file)
+{
+    dTHX;
+    SV *app;
+    char *code;
+
+    code = apr_psprintf(pool, "do q\"%s\" or die $@",
+            ap_escape_quotes(pool, file));
+    app = eval_pv(code, FALSE);
+
+    if (SvTRUE(ERRSV)) {
+        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL, "%s", SvPV_nolen(ERRSV));
+        return NULL;
+    }
+    if (!SvOK(app) || !SvROK(app) || SvTYPE(SvRV(app)) != SVt_PVCV) {
+        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL,
+                "%s does not return an application code reference", file);
+        return NULL;
+    }
+    return app;
+}
+
 static int psgi_handler(request_rec *r)
 {
     SV *app, *env, *res;
@@ -459,6 +480,14 @@ static int psgi_handler(request_rec *r)
         return DECLINED;
     }
     app = apr_hash_get(app_mapping, c->file, APR_HASH_KEY_STRING);
+    if (app == NULL) {
+        app = load_psgi(r->pool, c->file);
+        if (app == NULL) {
+            server_error(r, "%s had compilation errors.", c->file);
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+        apr_hash_set(app_mapping, c->file, APR_HASH_KEY_STRING, app);
+    }
     env = make_env(r);
     res = run_app(r, app, env);
     if (res == NULL) {
@@ -488,28 +517,6 @@ static apr_status_t psgi_child_exit(void *p)
 static void psgi_child_init(apr_pool_t *p, server_rec *s)
 {
     apr_pool_cleanup_register(p, NULL, psgi_child_exit, psgi_child_exit);
-}
-
-static SV *load_psgi(apr_pool_t *pool, const char *file)
-{
-    dTHX;
-    SV *app;
-    char *code;
-
-    code = apr_psprintf(pool, "do q\"%s\" or die $@",
-            ap_escape_quotes(pool, file));
-    app = eval_pv(code, FALSE);
-
-    if (SvTRUE(ERRSV)) {
-        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL, "%s", SvPV_nolen(ERRSV));
-        return NULL;
-    }
-    if (!SvOK(app) || !SvROK(app) || SvTYPE(SvRV(app)) != SVt_PVCV) {
-        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL,
-                "%s does not return an application code reference", file);
-        return NULL;
-    }
-    return app;
 }
 
 static apr_status_t
