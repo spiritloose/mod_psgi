@@ -25,13 +25,20 @@ runtests() unless caller;
 
 sub app {
     my $env = shift;
+    open my $failure_fh, '>', \my $failure;
+    local *Test::More::builder = sub {
+        my $builder = Test::Builder->new;
+        $builder->failure_output($failure_fh);
+        $builder;
+    };
     my $index = $env->{HTTP_X_PLACK_TEST};
     my $test = $Plack::Test::Suite::TEST[$index];
     note $test->[0];
     my $app = $test->[2];
     my $res = $app->($env);
     ok $res;
-    done_testing;
+    close $failure_fh;
+    $env->{'psgi.errors'}->print($failure) if $failure;
     $res;
 }
 

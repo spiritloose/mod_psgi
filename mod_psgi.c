@@ -37,12 +37,11 @@
 module AP_MODULE_DECLARE_DATA psgi_module;
 
 typedef struct {
-    char *psgi_app;
+    char *file;
+    SV *app;
 } psgi_dir_config;
 
-static int argc = 0;
-static char *argv[] = { "", NULL };
-static char **envp = NULL;
+static PerlInterpreter *perlinterp;
 
 static void server_error(request_rec *r, const char *fmt, ...)
 {
@@ -192,27 +191,6 @@ static SV *make_env(request_rec *r)
     hv_store(env, "psgi.async", 10, newSViv(0), 0);
 
     return newRV_inc((SV *) env);
-}
-
-static SV *load_psgi(request_rec *r, const char *file)
-{
-    dTHX;
-    SV *app;
-    char *code;
-
-    code = apr_psprintf(r->pool, "do q\"%s\" or die $@",
-            ap_escape_quotes(r->pool, file));
-    app = eval_pv(code, FALSE);
-
-    if (SvTRUE(ERRSV)) {
-        server_error(r, "%s", SvPV_nolen(ERRSV));
-        return NULL;
-    }
-    if (!SvOK(app) || !SvROK(app) || SvTYPE(SvRV(app)) != SVt_PVCV) {
-        server_error(r, "%s does not return an application code reference", file);
-        return NULL;
-    }
-    return app;
 }
 
 static SV *run_app(request_rec *r, SV *app, SV *env)
@@ -465,20 +443,18 @@ static int output_response(request_rec *r, SV *res)
     return rc;
 }
 
-static void init_perl_variables(request_rec *r)
+static void init_perl_variables()
 {
     dTHX;
     GV *exit_gv = gv_fetchpv("CORE::GLOBAL::exit", TRUE, SVt_PVCV);
     GvCV(exit_gv) = get_cv("ModPSGI::exit", TRUE);
     GvIMPORTED_CV_on(exit_gv);
-    sv_setpv_mg(get_sv("0", FALSE), r->server->process->argv[0]);
     hv_store(GvHV(PL_envgv), "MOD_PSGI", 8, newSVpv(MOD_PSGI_VERSION, 0), 0);
 }
 
 static int psgi_handler(request_rec *r)
 {
     SV *app, *env, *res;
-    PerlInterpreter *my_perl;
     psgi_dir_config *c;
     int rc;
 
@@ -488,27 +464,14 @@ static int psgi_handler(request_rec *r)
 
     c = (psgi_dir_config *) ap_get_module_config(r->per_dir_config, &psgi_module);
 
-    if (c->psgi_app == NULL) {
+    if (c->file == NULL) {
         ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 0, r->server,
                 "PSGIApp not configured");
         return DECLINED;
     }
 
-    my_perl = perl_alloc();
-    PL_perl_destruct_level = 1;
-    perl_construct(my_perl);
-    perl_parse(my_perl, xs_init, argc, argv, envp);
-    PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
-    perl_run(my_perl);
-    init_perl_variables(r);
-
-    app = load_psgi(r, c->psgi_app);
-    if (app == NULL) {
-        rc = HTTP_INTERNAL_SERVER_ERROR;
-        goto exit;
-    }
     env = make_env(r);
-    res = run_app(r, app, env);
+    res = run_app(r, c->app, env);
     if (res == NULL) {
         server_error(r, "invalid response");
         rc = HTTP_INTERNAL_SERVER_ERROR;
@@ -517,9 +480,6 @@ static int psgi_handler(request_rec *r)
     rc = output_response(r, res);
     goto exit;
 exit:
-    PL_perl_destruct_level = 1;
-    perl_destruct(my_perl);
-    perl_free(my_perl);
     return rc;
 }
 
@@ -532,37 +492,89 @@ static int supported_mpm()
 
 static apr_status_t psgi_child_exit(void *p)
 {
+    PerlInterpreter *my_perl = perlinterp;
+    PL_perl_destruct_level = 1;
+    perl_destruct(my_perl);
+    perl_free(my_perl);
     PERL_SYS_TERM();
     return OK;
 }
 
 static void psgi_child_init(apr_pool_t *p, server_rec *s)
 {
-    PERL_SYS_INIT3(&argc, (char ***) argv, &envp);
     apr_pool_cleanup_register(p, NULL, psgi_child_exit, psgi_child_exit);
+}
+
+static SV *load_psgi(apr_pool_t *pool, const char *file)
+{
+    dTHX;
+    SV *app;
+    char *code;
+
+    code = apr_psprintf(pool, "do q\"%s\" or die $@",
+            ap_escape_quotes(pool, file));
+    app = eval_pv(code, FALSE);
+
+    if (SvTRUE(ERRSV)) {
+        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL, "%s", SvPV_nolen(ERRSV));
+        return NULL;
+    }
+    if (!SvOK(app) || !SvROK(app) || SvTYPE(SvRV(app)) != SVt_PVCV) {
+        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL,
+                "%s does not return an application code reference", file);
+        return NULL;
+    }
+    return app;
+}
+
+static int psgi_pre_configured = 0;
+
+static int psgi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp)
+{
+    int argc = 2;
+    char *argv[] = { "perl", "-e;0", NULL };
+    char **envp = NULL;
+
+    if (psgi_pre_configured) return OK;
+    PERL_SYS_INIT3(&argc, (char ***) argv, &envp);
+    perlinterp = perl_alloc();
+    PL_perl_destruct_level = 1;
+    perl_construct(perlinterp);
+    perl_parse(perlinterp, xs_init, argc, argv, envp);
+    PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
+    perl_run(perlinterp);
+    init_perl_variables();
+    psgi_pre_configured++;
+    return OK;
 }
 
 static void psgi_register_hooks(apr_pool_t *p)
 {
     if (supported_mpm()) {
-        ap_hook_handler(psgi_handler, NULL, NULL, APR_HOOK_MIDDLE);
+        ap_hook_pre_config(psgi_pre_config, NULL, NULL, APR_HOOK_MIDDLE);
         ap_hook_child_init(psgi_child_init, NULL, NULL, APR_HOOK_MIDDLE);
+        ap_hook_handler(psgi_handler, NULL, NULL, APR_HOOK_MIDDLE);
     } else {
-        server_error(NULL, "mod_psgi only supports prefork mpm");
+        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL,
+                "mod_psgi only supports prefork mpm");
     }
 }
 
 static void *create_dir_config(apr_pool_t *p, char *path)
 {
     psgi_dir_config *c = apr_pcalloc(p, sizeof(psgi_dir_config));
-    c->psgi_app = NULL;
+    c->file = NULL;
     return (void *) c;
 }
 
 static const char *cmd_psgi_app(cmd_parms *cmd, void *conf, const char *v)
 {
     psgi_dir_config *c = (psgi_dir_config *) conf;
-    c->psgi_app = (char *) apr_pstrdup(cmd->pool, v);
+    c->file = (char *) apr_pstrdup(cmd->pool, v);
+    c->app = load_psgi(cmd->pool, c->file);
+    if (c->app == NULL) {
+        return apr_psprintf(cmd->pool, "%s had compilation errors.", c->file);
+    }
     return NULL;
 }
 
