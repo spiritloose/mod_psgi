@@ -235,18 +235,6 @@ static int output_status(request_rec *r, SV *status)
     return OK;
 }
 
-static int check_header_value(const char *value)
-{
-    int i;
-    int len = strlen(value);
-    for (i = 0; i < len; i++) {
-        if (value[i] < 37) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
 static int output_headers(request_rec *r, AV *headers)
 {
     dTHX;
@@ -258,10 +246,7 @@ static int output_headers(request_rec *r, AV *headers)
         if (key_sv == NULL || val_sv == NULL) break;
         key = SvPV_nolen(key_sv);
         val = SvPV_nolen(val_sv);
-        if (check_header_value(val) != 0) {
-            server_error(r, "value string must not contain characters below chr(37)");
-            return HTTP_INTERNAL_SERVER_ERROR;
-        } else if (strcmp(key, "Content-Type") == 0) {
+        if (strcmp(key, "Content-Type") == 0) {
             r->content_type = apr_pstrdup(r->pool, val);
         } else if (strcmp(key, "Status") == 0) {
             server_error(r, "headers must not contain a Status");
