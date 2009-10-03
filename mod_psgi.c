@@ -479,6 +479,8 @@ static int psgi_handler(request_rec *r)
                 "PSGIApp not configured");
         return DECLINED;
     }
+
+    PERL_SET_CONTEXT(perlinterp);
     app = apr_hash_get(app_mapping, c->file, APR_HASH_KEY_STRING);
     if (app == NULL) {
         app = load_psgi(r->pool, c->file);
