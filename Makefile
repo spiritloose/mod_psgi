@@ -41,7 +41,7 @@ clean:
 mod_psgi.c: ppport.h
 
 ppport.h:
-	perl -MDevel::PPPort -e 'Devel::PPPort::WriteFile'
+	$(PERL) -MDevel::PPPort -e 'Devel::PPPort::WriteFile'
 
 testconf:
 	$(MAKE) -C t conf
