@@ -13,6 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifdef _WIN32
+/* avoid to define duplicate definition of uid_t/gid_t in perl/CORE.h */
+#define uid_t _uid_t
+#define gid_t _gid_t
+#endif
 #include "httpd.h"
 #include "http_log.h"
 #include "http_config.h"
@@ -20,8 +25,16 @@
 #include "util_script.h"
 #include "ap_config.h"
 #include "ap_mpm.h"
+#include "apr_buckets.h"
 #include "apr_strings.h"
 #include "apr_hash.h"
+
+#ifdef _WIN32
+/* use perl's uid_t/gid_t. disable apr's macros. */
+#undef uid_t
+#undef gid_t
+#undef exit
+#endif
 
 #include "EXTERN.h"
 #include "perl.h"
@@ -30,6 +43,12 @@
 #define NEED_newRV_noinc
 #define NEED_sv_2pv_flags
 #include "ppport.h"
+
+#ifdef _WIN32
+/* no use perl compatible macros. it break apr's structure. ex: bucket->link */
+#undef link
+#undef read
+#endif
 
 #define PSGI_HANDLER_NAME "psgi"
 
@@ -300,7 +319,7 @@ static int output_body_ary(request_rec *r, AV *bodys)
     I32 lastidx;
     char *buf;
     STRLEN len;
-    apr_off_t clen;
+    apr_off_t clen = 0;
 
     lastidx = av_len(bodys);
     for (i = 0; i <= lastidx; i++) {
@@ -321,6 +340,7 @@ static int output_body_obj(request_rec *r, SV *obj, int type)
     SV *buf_sv, *rs;
     apr_off_t clen = 0;
     STRLEN len;
+    dSP;
     char *buf;
     int count;
 
@@ -329,7 +349,6 @@ static int output_body_obj(request_rec *r, SV *obj, int type)
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    dSP;
     ENTER;
     SAVETMPS;
     SAVESPTR(PL_rs);
@@ -499,20 +518,16 @@ static int psgi_handler(request_rec *r)
     return output_response(r, res);
 }
 
-static int supported_mpm()
-{
-    int result;
-    ap_mpm_query(AP_MPMQ_IS_FORKED, &result);
-    return result;
-}
-
 static apr_status_t psgi_child_exit(void *p)
 {
-    PerlInterpreter *my_perl = perlinterp;
-    PL_perl_destruct_level = 1;
-    perl_destruct(my_perl);
-    perl_free(my_perl);
-    PERL_SYS_TERM();
+    if (perlinterp == NULL) {
+        PERL_SET_CONTEXT(perlinterp);
+        PL_perl_destruct_level = 1;
+        perl_destruct(perlinterp);
+        perl_free(perlinterp);
+        PERL_SYS_TERM();
+        perlinterp = NULL;
+    }
     return OK;
 }
 
@@ -578,15 +593,10 @@ psgi_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_
 
 static void psgi_register_hooks(apr_pool_t *p)
 {
-    if (supported_mpm()) {
-        ap_hook_pre_config(psgi_pre_config, NULL, NULL, APR_HOOK_MIDDLE);
-        ap_hook_post_config(psgi_post_config, NULL, NULL, APR_HOOK_MIDDLE);
-        ap_hook_child_init(psgi_child_init, NULL, NULL, APR_HOOK_MIDDLE);
-        ap_hook_handler(psgi_handler, NULL, NULL, APR_HOOK_MIDDLE);
-    } else {
-        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL,
-                "mod_psgi only supports prefork mpm");
-    }
+    ap_hook_pre_config(psgi_pre_config, NULL, NULL, APR_HOOK_MIDDLE);
+    ap_hook_post_config(psgi_post_config, NULL, NULL, APR_HOOK_MIDDLE);
+    ap_hook_child_init(psgi_child_init, NULL, NULL, APR_HOOK_MIDDLE);
+    ap_hook_handler(psgi_handler, NULL, NULL, APR_HOOK_MIDDLE);
 }
 
 static void *create_dir_config(apr_pool_t *p, char *path)
