@@ -33,7 +33,7 @@ if test "$PERL" = no; then
 fi
 AC_SUBST(PERL)
 
-AC_OUTPUT(Makefile)
+AC_OUTPUT([Makefile t/Makefile])
 
 echo "
 $PACKAGE_NAME $PACKAGE_VERSION configuration:

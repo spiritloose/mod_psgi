@@ -6,13 +6,3 @@ PassEnv PERL5LIB
   PSGIApp [% dir %]/[% file %]
 </Location>
 [% END -%]
-
-NameVirtualHost *:[% port %]
-Listen [% port %]
-<VirtualHost *:[% port %]>
-  ServerName plack.test.suite
-  <Location />
-    SetHandler psgi
-    PSGIApp [% dir %]/suite.t
-  </Location>
-</VirtualHost>

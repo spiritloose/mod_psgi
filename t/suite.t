@@ -1,60 +1,52 @@
 use strict;
 use warnings;
-
 use Test::More;
+use File::Temp;
 use Plack::Test::Suite;
-use Path::Class;
 
-our $Port = $ENV{PLACK_TEST_SUITE_PORT} || 8080;
+warn $ENV{HTTPD};
+Plack::Test::Suite->run_server_tests(\&run_httpd);
+done_testing();
 
-$Plack::Test::Suite::BaseDir = do {
-    my $dir = do {
-        if ($ENV{PLACK_DIR}) {
-            dir($ENV{PLACK_DIR})->file('t')->stringify;
-        } else {
-            my $pmdir = file($INC{'Plack/Test/Suite.pm'})->dir;
-            $pmdir->file('..', '..', '..', 't')->resolve->stringify;
-        }
-    };
-    die "Plack test dir 't' not found" unless -e $dir;
-    $dir;
-};
+sub run_httpd {
+    my $port = shift;
 
-return \&app if $ENV{MOD_PSGI};
-runtests() unless caller;
+    my $tmpdir = $ENV{APACHE2_TMP_DIR} || File::Temp::tempdir( CLEANUP => 1 );
 
-sub app {
-    my $env = shift;
-    open my $failure_fh, '>', \my $failure;
-    local *Test::More::builder = sub {
-        my $builder = Test::Builder->new;
-        $builder->failure_output($failure_fh);
-        $builder;
-    };
-    my $index = $env->{HTTP_X_PLACK_TEST};
-    my $test = $Plack::Test::Suite::TEST[$index];
-    note $test->[0];
-    my $app = $test->[2];
-    my $res = $app->($env);
-    ok $res;
-    close $failure_fh;
-    $env->{'psgi.errors'}->print($failure) if $failure;
-    $res;
+    write_file("$tmpdir/app.psgi", _render_psgi());
+    write_file("$tmpdir/httpd.conf", _render_conf($tmpdir, $port, "$tmpdir/app.psgi"));
+
+    exec "httpd -X -D FOREGROUND -f $tmpdir/httpd.conf";
 }
 
-sub runtests {
-    require LWP::UserAgent;
-    my $ua = LWP::UserAgent->new;
-    my $index = 0;
-    Plack::Test::Suite->runtests(sub {
-        my ($name, $reqgen, $handler, $test) = @_;
-        note $name;
-        my $req = $reqgen->($Port);
-        $req->headers->header('X-Plack-Test' => $index++);
-        my $res = $ua->request($req);
-        local $Test::Builder::Level = $Test::Builder::Level + 3;
-        $test->($res, $Port);
-    });
-    done_testing;
+sub write_file {
+    my($path, $content) = @_;
+
+    open my $out, ">", $path or die "$path: $!";
+    print $out $content;
 }
 
+sub _render_psgi {
+    return <<'EOF';
+use lib "lib";
+use Plack::Test::Suite;
+
+Plack::Test::Suite->test_app_handler;
+EOF
+}
+
+sub _render_conf {
+    my ($tmpdir, $port, $psgi_path) = @_;
+    <<"END";
+LoadModule psgi_module modules/mod_psgi.so
+PidFile $tmpdir/httpd.pid
+LockFile $tmpdir/httpd.lock
+ErrorLog $tmpdir/error_log
+Listen $port
+
+<Location />
+SetHandler psgi
+PSGIApp $tmpdir/app.psgi
+</Location>
+END
+}

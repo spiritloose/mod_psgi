@@ -1,3 +1,7 @@
+APXS=@APXS@
+AP_SBINDIR=$(shell $(APXS) -q sbindir)
+AP_PROGNAME=$(shell $(APXS) -q progname)
+HTTPD=$(AP_SBINDIR)/$(AP_PROGNAME)
 all: conf
 test: test.conf
 	prove -I.. .

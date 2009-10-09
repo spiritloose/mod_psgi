@@ -43,14 +43,12 @@ sub make_params {
     chdir_do $Bin => sub {
         push @files, $_ while <[0-9]*.t>;
         $dir = getcwd;
-        require 'suite.t';
     };
     no warnings 'once';
     +{
         dir   => $dir,
         files => \@files,
         path  => $t::TestModPSGI::Path,
-        port  => $main::Port,
     };
 }
 
