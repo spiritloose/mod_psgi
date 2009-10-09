@@ -2,11 +2,16 @@ This is Apache2 module mod_psgi.
 
 * Install
 
-Just type 'make' and 'make install'.
-You can specify apxs and perl as follows:
+    % ./configure
+    % make
+    % sudo make install
 
-    % make APXS=/usr/local/apache2/bin/apxs PERL=/usr/local/bin/perl
-    % sudo make APXS=/usr/local/apache2/bin/apxs PERL=/usr/local/bin/perl install
+You can specify apxs, apachectl and perl as follows:
+
+    % ./configure \
+        --with-apxs=/path/to/apxs \
+        --with-apctl=/path/to/apachectl \
+        --with-perl=/path/to/perl
 
 Then activate it in Apache's httpd.conf file for instance
 for the URL /psgi in as follows:

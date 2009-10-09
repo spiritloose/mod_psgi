@@ -5,3 +5,8 @@
 *.o
 *.slo
 /t/test.conf
+/Makefile
+/autom4te*.cache
+/config.log
+/config.status
+/configure
