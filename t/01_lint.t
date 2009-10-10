@@ -12,8 +12,8 @@ __END__
 --- request
 method: GET
 code: |
-  require Plack::Lint;
-  eval { Plack::Lint->validate_env($env) };
+  require Plack::Middleware::Lint;
+  eval { Plack::Middleware::Lint->validate_env($env) };
   $@ || 'valid env';
 --- response
 is_success: ok
