@@ -75,27 +75,27 @@ sub setup_tests() {
     setup_plan;
 }
 
-sub compare($$$;@) {
-    my ($res, $input, $expected, @args) = @_;
+sub compare($$$$;@) {
+    my ($res, $input, $expected, $name, @args) = @_;
     my $ref = ref $expected;
     if ($ref eq 'CODE') {
         no warnings 'prototype';
-        compare($res, $input, $expected->());
+        compare($res, $input, $expected->(), $name);
     } elsif ($ref eq 'Regexp') {
-        like $res->$input(@args), $expected;
+        like $res->$input(@args), $expected, $name;
     } elsif ($ref eq 'HASH') {
         while (my ($key, $val) = each %$expected) {
             no warnings 'prototype';
-            compare($res, $input, $val, $key);
+            compare($res, $input, $val, $name, $key);
         }
     } elsif ($ref) {
-        is_deeply $res->$input(@args), $expected;
+        is_deeply $res->$input(@args), $expected, $name;
     } elsif ($expected eq 'ok') {
-        ok $res->$input(@args);
+        ok $res->$input(@args), $name;
     } elsif ($expected eq 'not ok') {
-        ok !$res->$input(@args);
+        ok !$res->$input(@args), $name;
     } else {
-        is $res->$input(@args), $expected;
+        is $res->$input(@args), $expected, $name;
     }
 }
 
@@ -126,29 +126,25 @@ END_CONF
     exec "$httpd -X -D FOREGROUND -f $tmpdir/httpd.conf";
 }
 
+sub run_requests($) {
+    my $port = shift;
+    setup_tests;
+    run {
+        my $block = shift;
+        my $req = $block->request;
+        my $res = eval_request($port, $req->{method}, $req->{code}, @{$req->{args}});
+        my $response = $block->response;
+        local $Test::Builder::Level = $Test::Builder::Level + 5;
+        while (my ($input, $expected) = each %$response) {
+            compare($res, $input, $expected, $block->name);
+        }
+    };
+}
+
 sub run_server_tests() {
     my ($pkg, $file) = caller;
     $TestFile = $file;
-    test_tcp(
-        client => sub {
-            my $port = shift;
-            setup_tests;
-            run {
-                my $block = shift;
-                my $req = $block->request;
-                my $res = eval_request($port, $req->{method}, $req->{code}, @{$req->{args}});
-                my $response = $block->response;
-                #local $Test::Builder::Level = $Test::Builder::Level + 3;
-                while (my ($input, $expected) = each %$response) {
-                    compare($res, $input, $expected);
-                }
-            };
-        },
-        server => sub {
-            my $port = shift;
-            run_httpd($port);
-        },
-    );
+    test_tcp(client => \&run_requests, server => \&run_httpd);
 }
 
 1;
