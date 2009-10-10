@@ -1,5 +1,0 @@
-TESTS=.
-all: test
-test:
-	prove -I.. $(TESTS)
-.PHONY: test
