@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use Test::Base -Base;
 
+use t::Config;
 use File::Basename;
 use URI::Escape;
 use List::Util qw(sum);
@@ -103,9 +104,10 @@ our $TestFile;
 sub run_httpd($) {
     my $port = shift;
     my $tmpdir = $ENV{APACHE2_TMP_DIR} || File::Temp::tempdir(CLEANUP => 1);
-    chomp(my $libexecdir = `$ENV{APXS} -q libexecdir`);
-    chomp(my $sbindir = `$ENV{APXS} -q sbindir`);
-    chomp(my $progname = `$ENV{APXS} -q progname`);
+    my $apxs = $t::Config::APXS;
+    chomp(my $libexecdir = `$apxs -q libexecdir`);
+    chomp(my $sbindir = `$apxs -q sbindir`);
+    chomp(my $progname = `$apxs -q progname`);
     my $httpd = "$sbindir/$progname";
     my $conf = <<"END_CONF";
 LoadModule psgi_module $libexecdir/mod_psgi.so

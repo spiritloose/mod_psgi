@@ -1,6 +1,5 @@
-APXS=@APXS@
 TESTS=.
 all: test
 test:
-	APXS=$(APXS) prove -I.. $(TESTS)
+	prove -I.. $(TESTS)
 .PHONY: test

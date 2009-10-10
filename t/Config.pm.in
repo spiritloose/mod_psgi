@@ -1,0 +1,9 @@
+package t::Config;
+use strict;
+use warnings;
+
+our $APXS = '@APXS@';
+
+1;
+__END__
+
