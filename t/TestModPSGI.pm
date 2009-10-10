@@ -6,14 +6,13 @@ use Test::Base -Base;
 use File::Basename;
 use URI::Escape;
 use List::Util qw(sum);
+use Test::TCP;
+use File::Temp;
 
 our @EXPORT = qw(
     running_in_mod_psgi eval_body_app eval_response_app
-    run_eval_request
+    run_server_tests
 );
-
-our $Host = '127.0.0.1';
-our $Path = '/psgi/t';
 
 BEGIN {
     no warnings 'redefine';
@@ -49,13 +48,12 @@ sub ua() {
 }
 
 sub eval_request($$$;@) {
-    my ($file, $method, $code, @args) = @_;
+    my ($port, $method, $code, @args) = @_;
     if (ref $code eq 'CODE') {
         no warnings 'prototype';
-        return eval_request($file, $method, $code->(), @args);
+        return eval_request($port, $method, $code->(), @args);
     }
-    my $uri = sprintf 'http://%s%s/%s?%s', $Host, $Path,
-            basename($file), uri_escape($code);
+    my $uri = sprintf 'http://localhost:%d/?%s', $port, uri_escape($code);
     $method = lc $method;
     ua->$method($uri, @args);
 }
@@ -100,19 +98,55 @@ sub compare($$$;@) {
     }
 }
 
-sub run_eval_request() {
+our $TestFile;
+
+sub run_httpd($) {
+    my $port = shift;
+    my $tmpdir = $ENV{APACHE2_TMP_DIR} || File::Temp::tempdir(CLEANUP => 1);
+    chomp(my $libexecdir = `$ENV{APXS} -q libexecdir`);
+    chomp(my $sbindir = `$ENV{APXS} -q sbindir`);
+    chomp(my $progname = `$ENV{APXS} -q progname`);
+    my $httpd = "$sbindir/$progname";
+    my $conf = <<"END_CONF";
+LoadModule psgi_module $libexecdir/mod_psgi.so
+PidFile  $tmpdir/httpd.pid
+LockFile $tmpdir/httpd.lock
+ErrorLog $tmpdir/error_log
+Listen $port
+<Location />
+  SetHandler psgi
+  PSGIApp $TestFile
+</Location>
+END_CONF
+    open my $fh, '>', "$tmpdir/httpd.conf" or die $!;
+    print $fh $conf;
+    close $fh;
+    exec "$httpd -X -D FOREGROUND -f $tmpdir/httpd.conf";
+}
+
+sub run_server_tests() {
     my ($pkg, $file) = caller;
-    setup_tests;
-    run {
-        my $block = shift;
-        my $req = $block->request;
-        my $res = eval_request($file, $req->{method}, $req->{code},
-                @{$req->{args}});
-        my $response = $block->response;
-        while (my ($input, $expected) = each %$response) {
-            compare($res, $input, $expected);
-        }
-    };
+    $TestFile = $file;
+    test_tcp(
+        client => sub {
+            my $port = shift;
+            setup_tests;
+            run {
+                my $block = shift;
+                my $req = $block->request;
+                my $res = eval_request($port, $req->{method}, $req->{code}, @{$req->{args}});
+                my $response = $block->response;
+                #local $Test::Builder::Level = $Test::Builder::Level + 3;
+                while (my ($input, $expected) = each %$response) {
+                    compare($res, $input, $expected);
+                }
+            };
+        },
+        server => sub {
+            my $port = shift;
+            run_httpd($port);
+        },
+    );
 }
 
 1;

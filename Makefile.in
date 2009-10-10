@@ -34,9 +34,8 @@ install: install-modules-yes
 
 #   cleanup
 clean:
-	-rm -f mod_psgi.o mod_psgi.lo mod_psgi.slo mod_psgi.la 
+	rm -f mod_psgi.o mod_psgi.lo mod_psgi.slo mod_psgi.la
 	rm -f ppport.h
-	$(MAKE) -C t clean
 
 realclean: clean
 	rm -f Makefile
@@ -52,7 +51,7 @@ ppport.h:
 testconf:
 	$(MAKE) -C t conf
 
-test: reload
+test:
 	$(MAKE) -C t test
 
 #   install and activate shared object by reloading Apache to

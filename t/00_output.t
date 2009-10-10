@@ -23,7 +23,7 @@ BEGIN {
 
 return eval_response_app if running_in_mod_psgi;
 
-run_eval_request;
+run_server_tests;
 
 __END__
 
