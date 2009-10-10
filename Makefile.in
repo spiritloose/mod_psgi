@@ -35,7 +35,6 @@ install: install-modules-yes
 #   cleanup
 clean:
 	rm -f mod_psgi.o mod_psgi.lo mod_psgi.slo mod_psgi.la
-	rm -f ppport.h
 
 realclean: clean
 	rm -f Makefile
