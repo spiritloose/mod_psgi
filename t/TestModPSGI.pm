@@ -4,21 +4,16 @@ use warnings;
 use Test::Base -Base;
 
 use t::Config;
-use File::Basename;
 use URI::Escape;
 use List::Util qw(sum);
 use Test::TCP;
 use File::Temp;
+use Cwd;
 
 our @EXPORT = qw(
     running_in_mod_psgi eval_body_app eval_response_app
     run_server_tests
 );
-
-BEGIN {
-    no warnings 'redefine';
-    *Test::Base::run_compare = sub {}; # XXX
-}
 
 sub running_in_mod_psgi() {
     exists $ENV{MOD_PSGI};
@@ -103,14 +98,15 @@ our $TestFile;
 
 sub run_httpd($) {
     my $port = shift;
-    my $tmpdir = $ENV{APACHE2_TMP_DIR} || File::Temp::tempdir(CLEANUP => 1);
+    my $tmpdir = $ENV{MOD_PSGI_TMP_DIR} || File::Temp::tempdir(CLEANUP => 1);
     my $apxs = $t::Config::APXS;
     chomp(my $libexecdir = `$apxs -q libexecdir`);
     chomp(my $sbindir = `$apxs -q sbindir`);
     chomp(my $progname = `$apxs -q progname`);
     my $httpd = "$sbindir/$progname";
+    my $cwd = getcwd;
     my $conf = <<"END_CONF";
-LoadModule psgi_module $libexecdir/mod_psgi.so
+LoadModule psgi_module $cwd/.libs/mod_psgi.so
 PidFile  $tmpdir/httpd.pid
 LockFile $tmpdir/httpd.lock
 ErrorLog $tmpdir/error_log

@@ -39,7 +39,7 @@ mod_psgi.c: ppport.h
 ppport.h:
 	$(PERL) -MDevel::PPPort -e 'Devel::PPPort::WriteFile'
 
-test:
+test: .libs/mod_psgi.so
 	prove $(TESTS)
 
 reload: install restart
