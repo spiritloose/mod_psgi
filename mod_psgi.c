@@ -230,7 +230,7 @@ static SV *run_app(request_rec *r, SV *app, SV *env)
     XPUSHs(sv_2mortal(env));
     PUTBACK;
 
-    count = call_sv(app, G_EVAL|G_KEEPERR|G_SCALAR);
+    count = call_sv(app, G_EVAL|G_SCALAR);
     SPAGAIN;
     if (SvTRUE(ERRSV)) {
         res = NULL;
