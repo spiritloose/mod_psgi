@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 our $APXS = '@APXS@';
+our $ABS_TOP_BUILDDIR = '@abs_top_builddir@';
 
 1;
 __END__

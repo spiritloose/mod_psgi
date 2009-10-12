@@ -8,7 +8,6 @@ use URI::Escape;
 use List::Util qw(sum);
 use Test::TCP;
 use File::Temp;
-use Cwd;
 
 our @EXPORT = qw(
     running_in_mod_psgi eval_body_app eval_response_app
@@ -104,16 +103,16 @@ sub run_httpd($) {
     chomp(my $sbindir = `$apxs -q sbindir`);
     chomp(my $progname = `$apxs -q progname`);
     my $httpd = "$sbindir/$progname";
-    my $cwd = getcwd;
+    my $topdir = $t::Config::ABS_TOP_BUILDDIR;
     my $conf = <<"END_CONF";
-LoadModule psgi_module $cwd/.libs/mod_psgi.so
+LoadModule psgi_module $topdir/.libs/mod_psgi.so
 PidFile  $tmpdir/httpd.pid
 LockFile $tmpdir/httpd.lock
 ErrorLog $tmpdir/error_log
 Listen $port
 <Location />
   SetHandler psgi
-  PSGIApp $TestFile
+  PSGIApp $topdir/$TestFile
 </Location>
 END_CONF
     open my $fh, '>', "$tmpdir/httpd.conf" or die $!;

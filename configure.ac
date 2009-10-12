@@ -29,7 +29,7 @@ if test -z "${PERL}"; then
     AC_PATH_PROG(PERL, perl, no, [$PATH])
 fi
 if test "$PERL" = no; then
-    AC_MSG_ERROR([perl not found set perl with --with-perl.])
+    AC_MSG_ERROR([perl not found. set perl with --with-perl.])
 fi
 AC_SUBST(PERL)
 
