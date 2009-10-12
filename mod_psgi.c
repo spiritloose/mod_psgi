@@ -264,20 +264,23 @@ static int output_headers(request_rec *r, AV *headers)
 {
     dTHX;
     SV *key_sv, *val_sv;
-    char *key, *val;
+    char *key;
+
+    r->content_type = NULL;
     while (av_len(headers) > -1) {
         key_sv = av_shift(headers);
         val_sv = av_shift(headers);
         if (key_sv == NULL || val_sv == NULL) break;
         key = SvPV_nolen(key_sv);
-        val = SvPV_nolen(val_sv);
         if (strcmp(key, "Content-Type") == 0) {
-            r->content_type = apr_pstrdup(r->pool, val);
+            r->content_type = apr_pstrdup(r->pool, SvPV_nolen(val_sv));
+        } else if (strcmp(key, "Content-Length") == 0) {
+            ap_set_content_length(r, SvIV(val_sv));
         } else if (strcmp(key, "Status") == 0) {
             server_error(r, "headers must not contain a Status");
             return HTTP_INTERNAL_SERVER_ERROR;
         } else {
-            apr_table_add(r->headers_out, key, val);
+            apr_table_add(r->headers_out, key, SvPV_nolen(val_sv));
         }
     }
     return OK;
@@ -304,13 +307,6 @@ static int respond_to(SV *obj, const char *method)
     return res;
 }
 
-static void set_content_length(request_rec *r, apr_off_t length)
-{
-    if (apr_table_get(r->headers_out, "Content-Length") == NULL) {
-        apr_table_add(r->headers_out, "Content-Length", apr_off_t_toa(r->pool, length));
-    }
-}
-
 static int output_body_ary(request_rec *r, AV *bodys)
 {
     dTHX;
@@ -330,7 +326,9 @@ static int output_body_ary(request_rec *r, AV *bodys)
             clen += len;
         }
     }
-    set_content_length(r, clen);
+    if (clen > 0) {
+        ap_set_content_length(r, clen);
+    }
     return OK;
 }
 
@@ -369,7 +367,9 @@ static int output_body_obj(request_rec *r, SV *obj, int type)
             break;
         }
     }
-    set_content_length(r, len);
+    if (len > 0) {
+        ap_set_content_length(r, len);
+    }
     PUSHMARK(SP);
     XPUSHs(obj);
     PUTBACK;
