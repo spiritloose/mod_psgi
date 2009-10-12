@@ -8,9 +8,10 @@ PERL=@PERL@
 TESTS=t
 
 builddir=.
-top_srcdir=$(shell $(APXS) -q exp_datadir)
-top_builddir=$(shell $(APXS) -q exp_datadir)
-include $(shell $(APXS) -q installbuilddir)/special.mk
+installbuilddir=$(shell $(APXS) -q installbuilddir)
+top_srcdir=$(shell dirname $(installbuilddir))
+top_builddir=$(top_srcdir)
+include $(installbuilddir)/special.mk
 
 ifdef MOD_PSGI_DEBUG
 DEBUG_DEFS=-DDEBUG
