@@ -11,6 +11,11 @@ if test "$APXS" = no; then
 fi
 AC_SUBST(APXS)
 
+AP_INSTALLBUILDDIR=`$APXS -q installbuilddir`
+AP_TOP_BUILDDIR=`dirname $AP_INSTALLBUILDDIR`
+AP_TOP_SRCDIR=$AP_TOP_SRCDIR
+AC_SUBST([AP_INSTALLBUILDDIR AP_TOP_BUILDDIR AP_TOP_SRCDIR])
+
 AC_ARG_WITH(apachectl, AC_HELP_STRING([--with-apctl=NAME],
             [name of the apachectl executable [[apachectl]]]),
             [APACHECTL="$with_apctl"])
@@ -32,6 +37,10 @@ if test "$PERL" = no; then
     AC_MSG_ERROR([perl not found. set perl with --with-perl.])
 fi
 AC_SUBST(PERL)
+
+PERL_CCOPTS=`$PERL -MExtUtils::Embed -e ccopts`
+PERL_LDOPTS=`$PERL -MExtUtils::Embed -e ldopts`
+AC_SUBST([PERL_CCOPTS PERL_LDOPTS])
 
 AC_OUTPUT([Makefile t/Config.pm])
 
