@@ -238,11 +238,12 @@ static SV *run_app(request_rec *r, SV *app, SV *env)
     XPUSHs(sv_2mortal(env));
     PUTBACK;
 
-    count = call_sv(app, G_EVAL|G_SCALAR);
+    count = call_sv(app, G_EVAL|G_SCALAR|G_KEEPERR);
     SPAGAIN;
     if (SvTRUE(ERRSV)) {
         res = NULL;
         server_error(r, "%s", SvPV_nolen(ERRSV));
+        CLEAR_ERRSV();
         POPs;
     } else if (count > 0) {
         res = POPs;
@@ -482,6 +483,7 @@ static SV *load_psgi(apr_pool_t *pool, const char *file)
 
     if (SvTRUE(ERRSV)) {
         ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL, "%s", SvPV_nolen(ERRSV));
+        CLEAR_ERRSV();
         return NULL;
     }
     if (!SvOK(app) || !SvROK(app) || SvTYPE(SvRV(app)) != SVt_PVCV) {
