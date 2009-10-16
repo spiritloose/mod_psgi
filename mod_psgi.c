@@ -213,7 +213,7 @@ static SV *make_env(request_rec *r)
     hv_store(env, "psgi.multithread", 16, newSViv(0), 0);
     hv_store(env, "psgi.multiprocess", 17, newSViv(1), 0);
     hv_store(env, "psgi.run_once", 13, newSViv(1), 0);
-    hv_store(env, "psgi.async", 10, newSViv(0), 0);
+    hv_store(env, "psgi.nonblocking", 16, newSViv(0), 0);
 
     return newRV_inc((SV *) env);
 }
