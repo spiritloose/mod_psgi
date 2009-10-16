@@ -169,36 +169,32 @@ static int copy_env(void *rec, const char *key, const char *val)
     return 1;
 }
 
-static SV *make_env(request_rec *r)
+static SV *make_env(request_rec *r, psgi_dir_config *c)
 {
     dTHX;
     HV *env;
     AV *version;
-    char *url_scheme, *location, *vpath, *path_info;
+    char *url_scheme, *script_name, *vpath, *path_info;
     SV *input, *errors;
-    psgi_dir_config *c;
 
     env = newHV();
-    c = (psgi_dir_config *) ap_get_module_config(r->per_dir_config, &psgi_module);
 
     ap_add_cgi_vars(r);
     ap_add_common_vars(r);
 
-    // fix SCRIPT_NAME & PATH_INFO
-    if (apr_table_get(r->subprocess_env, "PATH_INFO") == NULL) {
-        apr_table_set(r->subprocess_env, "PATH_INFO", "");
-    }
-    location = c->location == NULL ? "" : c->location;
-    if (strcmp(location, "/") == 0) {
-        location = "";
+    /* fix SCRIPT_NAME & PATH_INFO */
+    if (c->location == NULL || strcmp(c->location, "/") == 0) {
+        script_name = "";
+    } else {
+        script_name = c->location;
     }
     vpath = apr_pstrcat(r->pool,
-                        apr_table_get(r->subprocess_env, "SCRIPT_NAME"),
-                        apr_table_get(r->subprocess_env, "PATH_INFO"),
-                        NULL);
-    path_info = &vpath[ (int) strlen(location) ];
+            apr_table_get(r->subprocess_env, "SCRIPT_NAME"),
+            apr_table_get(r->subprocess_env, "PATH_INFO"),
+            NULL);
+    path_info = &vpath[strlen(script_name)];
     apr_table_set(r->subprocess_env, "PATH_INFO", path_info);
-    apr_table_set(r->subprocess_env, "SCRIPT_NAME", location);
+    apr_table_set(r->subprocess_env, "SCRIPT_NAME", script_name);
 
     apr_table_do(copy_env, env, r->subprocess_env, NULL);
 
@@ -521,7 +517,7 @@ static int psgi_handler(request_rec *r)
         }
         apr_hash_set(app_mapping, c->file, APR_HASH_KEY_STRING, app);
     }
-    env = make_env(r);
+    env = make_env(r, c);
     res = run_app(r, app, env);
     if (res == NULL) {
         server_error(r, "invalid response");
