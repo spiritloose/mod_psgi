@@ -60,6 +60,7 @@ module AP_MODULE_DECLARE_DATA psgi_module;
 
 typedef struct {
     char *file;
+    char *location;
 } psgi_dir_config;
 
 static PerlInterpreter *perlinterp = NULL;
@@ -173,21 +174,32 @@ static SV *make_env(request_rec *r)
     dTHX;
     HV *env;
     AV *version;
-    char *url_scheme;
+    char *url_scheme, *location, *vpath, *path_info;
     SV *input, *errors;
+    psgi_dir_config *c;
 
     env = newHV();
+    c = (psgi_dir_config *) ap_get_module_config(r->per_dir_config, &psgi_module);
 
     ap_add_cgi_vars(r);
     ap_add_common_vars(r);
+
+    // fix SCRIPT_NAME & PATH_INFO
     if (apr_table_get(r->subprocess_env, "PATH_INFO") == NULL) {
         apr_table_set(r->subprocess_env, "PATH_INFO", "");
     }
-    if (strcmp(apr_table_get(r->subprocess_env, "SCRIPT_NAME"), "/") == 0
-            && strcmp(apr_table_get(r->subprocess_env, "PATH_INFO"), "") == 0) {
-        apr_table_set(r->subprocess_env, "PATH_INFO", "/");
-        apr_table_set(r->subprocess_env, "SCRIPT_NAME", "");
+    location = c->location == NULL ? "" : c->location;
+    if (strcmp(location, "/") == 0) {
+        location = "";
     }
+    vpath = apr_pstrcat(r->pool,
+                        apr_table_get(r->subprocess_env, "SCRIPT_NAME"),
+                        apr_table_get(r->subprocess_env, "PATH_INFO"),
+                        NULL);
+    path_info = &vpath[ (int) strlen(location) ];
+    apr_table_set(r->subprocess_env, "PATH_INFO", path_info);
+    apr_table_set(r->subprocess_env, "SCRIPT_NAME", location);
+
     apr_table_do(copy_env, env, r->subprocess_env, NULL);
 
     version = newAV();
@@ -603,6 +615,7 @@ static void *create_dir_config(apr_pool_t *p, char *path)
 {
     psgi_dir_config *c = apr_pcalloc(p, sizeof(psgi_dir_config));
     c->file = NULL;
+    c->location = path;
     return (void *) c;
 }
 
