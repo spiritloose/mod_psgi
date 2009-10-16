@@ -29,13 +29,19 @@ Then after restarting Apache via
 
 * Spec
 
-    * This module works on Apache2 which is configured by '--with-mpm=prefork'.
-
     * PSGIApp files are loaded by 'do $file' at the time of startup parent process.
     The file must return a code reference that is a PSGI application.
 
     * The input stream ($env->{'psgi.input'}) is not seekable.
     $env->{'psgi.input'}->seek($pos, $whence) raises an error.
+
+* References
+
+    * Repository: http://github.com/spiritloose/mod_psgi
+
+    * PSGI/Plack: http://plackperl.org/
+
+    * PSGI specification: http://search.cpan.org/perldoc?PSGI
 
 * License
 
