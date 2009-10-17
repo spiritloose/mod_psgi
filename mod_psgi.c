@@ -297,6 +297,8 @@ static int output_headers(request_rec *r, AV *headers)
         } else {
             apr_table_add(r->headers_out, key, SvPV_nolen(val_sv));
         }
+        SvREFCNT_dec(key_sv);
+        SvREFCNT_dec(val_sv);
     }
     return OK;
 }
@@ -577,6 +579,7 @@ static int psgi_handler(request_rec *r)
 {
     SV *app, *env, *res;
     psgi_dir_config *c;
+    int rc;
 
     if (strcmp(r->handler, PSGI_HANDLER_NAME)) {
         return DECLINED;
@@ -589,22 +592,34 @@ static int psgi_handler(request_rec *r)
     }
 
     PERL_SET_CONTEXT(perlinterp);
+    ENTER;
+    SAVETMPS;
+
     app = apr_hash_get(app_mapping, c->file, APR_HASH_KEY_STRING);
     if (app == NULL) {
         app = load_psgi(r->pool, c->file);
         if (app == NULL) {
             server_error(r, "%s had compilation errors.", c->file);
-            return HTTP_INTERNAL_SERVER_ERROR;
+            rc = HTTP_INTERNAL_SERVER_ERROR;
+            goto exit;
         }
         apr_hash_set(app_mapping, c->file, APR_HASH_KEY_STRING, app);
     }
+
     env = make_env(r, c);
     res = run_app(r, app, env);
     if (res == NULL) {
         server_error(r, "invalid response");
-        return HTTP_INTERNAL_SERVER_ERROR;
+        rc = HTTP_INTERNAL_SERVER_ERROR;
+        goto exit;
     }
-    return output_response(r, res);
+    rc = output_response(r, res);
+    SvREFCNT_dec(res);
+
+exit:
+    FREETMPS;
+    LEAVE;
+    return rc;
 }
 
 static apr_status_t psgi_child_exit(void *p)
