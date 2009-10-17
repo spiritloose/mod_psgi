@@ -91,7 +91,7 @@ XS(ModPSGI_exit);
 XS(ModPSGI_exit)
 {
     dXSARGS;
-    I32 exitval = items > 0 ? SvIV(ST(0)) : 0;
+    int exitval = items > 0 ? SvIV(ST(0)) : 0;
     croak("exit(%d) was called", exitval);
     XSRETURN_UNDEF;
 }
@@ -197,7 +197,7 @@ static int copy_env(void *rec, const char *key, const char *val)
 {
     dTHX;
     HV *env = (HV *) rec;
-    hv_store(env, key, strlen(key), newSVpv(val, 0), 0);
+    (void) hv_store(env, key, strlen(key), newSVpv(val, 0), 0);
     return 1;
 }
 
@@ -233,27 +233,27 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
     version = newAV();
     av_push(version, newSViv(1));
     av_push(version, newSViv(0));
-    hv_store(env, "psgi.version", 12, newRV_inc((SV *) version), 0);
+    (void) hv_store(env, "psgi.version", 12, newRV_inc((SV *) version), 0);
 
     url_scheme = apr_table_get(r->subprocess_env, "HTTPS") == NULL ?  "http" : "https";
-    hv_store(env, "psgi.url_scheme", 15, newSVpv(url_scheme, 0), 0);
+    (void) hv_store(env, "psgi.url_scheme", 15, newSVpv(url_scheme, 0), 0);
 
     input = newRV_noinc(newSV(0));
     sv_magic(SvRV(input), NULL, PERL_MAGIC_ext, NULL, 0);
     mg_find(SvRV(input), PERL_MAGIC_ext)->mg_obj = (void *) r;
     sv_bless(input, gv_stashpv("ModPSGI::Input", 1));
-    hv_store(env, "psgi.input", 10, input, 0);
+    (void) hv_store(env, "psgi.input", 10, input, 0);
 
     errors = newRV_noinc(newSV(0));
     sv_magic(SvRV(errors), NULL, PERL_MAGIC_ext, NULL, 0);
     mg_find(SvRV(errors), PERL_MAGIC_ext)->mg_obj = (void *) r;
     sv_bless(errors, gv_stashpv("ModPSGI::Errors", 1));
-    hv_store(env, "psgi.errors", 11, errors, 0);
+    (void) hv_store(env, "psgi.errors", 11, errors, 0);
 
-    hv_store(env, "psgi.multithread", 16, newSViv(0), 0);
-    hv_store(env, "psgi.multiprocess", 17, newSViv(1), 0);
-    hv_store(env, "psgi.run_once", 13, newSViv(1), 0);
-    hv_store(env, "psgi.nonblocking", 16, newSViv(0), 0);
+    (void) hv_store(env, "psgi.multithread", 16, newSViv(0), 0);
+    (void) hv_store(env, "psgi.multiprocess", 17, newSViv(1), 0);
+    (void) hv_store(env, "psgi.run_once", 13, newSViv(1), 0);
+    (void) hv_store(env, "psgi.nonblocking", 16, newSViv(0), 0);
 
     return newRV_inc((SV *) env);
 }
@@ -575,7 +575,7 @@ static void init_perl_variables()
     GV *exit_gv = gv_fetchpv("CORE::GLOBAL::exit", TRUE, SVt_PVCV);
     GvCV(exit_gv) = get_cv("ModPSGI::exit", TRUE);
     GvIMPORTED_CV_on(exit_gv);
-    hv_store(GvHV(PL_envgv), "MOD_PSGI", 8, newSVpv(MOD_PSGI_VERSION, 0), 0);
+    (void) hv_store(GvHV(PL_envgv), "MOD_PSGI", 8, newSVpv(MOD_PSGI_VERSION, 0), 0);
 }
 
 static SV *load_psgi(apr_pool_t *pool, const char *file)
