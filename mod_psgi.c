@@ -93,7 +93,8 @@ XS(ModPSGI_exit);
 XS(ModPSGI_exit)
 {
     dXSARGS;
-    croak("exit");
+    I32 exitval = items > 0 ? SvIV(ST(0)) : 0;
+    croak("exit(%d) was called", exitval);
     XSRETURN_UNDEF;
 }
 
@@ -106,11 +107,9 @@ XS(ModPSGI_Input_read)
     request_rec *r = (request_rec *) mg_find(SvRV(self), PERL_MAGIC_ext)->mg_obj;
     apr_size_t len = SvIV(ST(2));
     apr_bucket_brigade *bb;
-    apr_bucket *bucket;
     apr_size_t nread = 0;
     char *pv, *tmp;
     int eos = 0;
-    dXSTARG;
 
     if (items >= 4) {
         croak("$env->{'psgi.input'}->read: mod_psgi can't handle offset");
@@ -174,10 +173,13 @@ XS(ModPSGI_Errors_print)
 {
     dXSARGS;
     SV *self = ST(0);
-    SV *msg  = ST(1);
-    dXSTARG;
+    SV *msg = NULL;
     request_rec *r = (request_rec *) mg_find(SvRV(self), PERL_MAGIC_ext)->mg_obj;
-    ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r->server, "%s", SvPV_nolen(msg));
+    int i;
+    for (i = 1; i < items; i++) {
+        msg = ST(i);
+        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r->server, "%s", SvPV_nolen(msg));
+    }
     XSRETURN_IV(1);
 }
 
@@ -188,9 +190,9 @@ xs_init(pTHX)
     dXSUB_SYS;
 
     newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
-    newXS("ModPSGI::exit", ModPSGI_exit, file);
+    newXSproto("ModPSGI::exit", ModPSGI_exit, file, ";$");
     newXSproto("ModPSGI::Input::read", ModPSGI_Input_read, file, "$$$;$");
-    newXSproto("ModPSGI::Errors::print", ModPSGI_Errors_print, file, "$$");
+    newXSproto("ModPSGI::Errors::print", ModPSGI_Errors_print, file, "$@");
 }
 
 static int copy_env(void *rec, const char *key, const char *val)
@@ -276,7 +278,7 @@ static SV *run_app(request_rec *r, SV *app, SV *env)
         res = NULL;
         server_error(r, "%s", SvPV_nolen(ERRSV));
         CLEAR_ERRSV();
-        POPs;
+        (void) POPs;
     } else if (count > 0) {
         res = POPs;
         SvREFCNT_inc(res);
@@ -378,7 +380,7 @@ static int output_body_ary(request_rec *r, AV *bodys)
 static int output_body_obj(request_rec *r, SV *obj, int type)
 {
     dTHX;
-    SV *buf_sv, *rs;
+    SV *buf_sv;
     apr_off_t clen = 0;
     STRLEN len;
     dSP;
@@ -459,7 +461,7 @@ static int output_body_path(request_rec *r, SV *body)
     int count;
     apr_status_t rc;
     SV *path_sv;
-    char *path;
+    char *path = NULL;
     dSP;
     ENTER;
     SAVETMPS;
@@ -473,7 +475,7 @@ static int output_body_path(request_rec *r, SV *body)
         rc = DECLINED;
         server_error(r, "unable to get path\n%s", SvPV_nolen(ERRSV));
         CLEAR_ERRSV();
-        POPs;
+        (void) POPs;
     } else if (count > 0) {
         path_sv = POPs;
         path = apr_pstrdup(r->pool, SvPV_nolen(path_sv));
