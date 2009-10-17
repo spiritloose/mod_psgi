@@ -684,9 +684,6 @@ psgi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp)
     perl_run(perlinterp);
     init_perl_variables();
 
-    psgi_apps = apr_array_make(pconf, 10, sizeof(char *));
-    app_mapping = apr_hash_make(pconf);
-
     return OK;
 }
 
@@ -706,6 +703,7 @@ psgi_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_
                 apr_pool_cleanup_null, s->process->pool);
         return OK;
     }
+    app_mapping = apr_hash_make(pconf);
     elts = (char **) psgi_apps->elts;
     for (i = 0; i < psgi_apps->nelts; i++) {
         file = elts[i];
@@ -735,7 +733,7 @@ static void *create_dir_config(apr_pool_t *p, char *path)
 {
     psgi_dir_config *c = apr_pcalloc(p, sizeof(psgi_dir_config));
     c->file = NULL;
-    c->location = path;
+    c->location = apr_pstrdup(p, path);
     return (void *) c;
 }
 
@@ -743,6 +741,9 @@ static const char *cmd_psgi_app(cmd_parms *cmd, void *conf, const char *v)
 {
     psgi_dir_config *c = (psgi_dir_config *) conf;
     c->file = (char *) apr_pstrdup(cmd->pool, v);
+    if (psgi_apps == NULL) {
+        psgi_apps = apr_array_make(cmd->pool, 10, sizeof(char *));
+    }
     *(const char **) apr_array_push(psgi_apps) = c->file;
     return NULL;
 }
