@@ -18,9 +18,9 @@ AC_SUBST(AP_INSTALLBUILDDIR)
 AC_SUBST(AP_TOP_BUILDDIR)
 AC_SUBST(AP_TOP_SRCDIR)
 
-AC_ARG_WITH(apachectl, AC_HELP_STRING([--with-apctl=NAME],
+AC_ARG_WITH(apachectl, AC_HELP_STRING([--with-apachectl=NAME],
             [name of the apachectl executable [[apachectl]]]),
-            [APACHECTL="$with_apctl"])
+            [APACHECTL="$with_apachectl"])
 if test -z "${APACHECTL}"; then
     AC_PATH_PROGS(APACHECTL, apache2ctl apachectl, no, [$PATH:/usr/sbin:/usr/local/apache2/bin])
 fi

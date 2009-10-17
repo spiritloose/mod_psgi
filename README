@@ -10,7 +10,7 @@ You can specify apxs, apachectl and perl as follows:
 
     % ./configure \
         --with-apxs=/path/to/apxs \
-        --with-apctl=/path/to/apachectl \
+        --with-apachectl=/path/to/apachectl \
         --with-perl=/path/to/perl
 
 Then activate it in Apache's httpd.conf file for instance
