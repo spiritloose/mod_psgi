@@ -45,6 +45,22 @@ PERL_LDOPTS=`$PERL -MExtUtils::Embed -e ldopts`
 AC_SUBST(PERL_CCOPTS)
 AC_SUBST(PERL_LDOPTS)
 
+AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
+            [enable debug mode]),
+            [ENABLE_DEBUG="$enable_debug"],
+            [ENABLE_DEBUG="no"])
+AP_LIBTOOL=`$APXS -q LIBTOOL`
+eval `$AP_LIBTOOL --config | grep "^CC"`
+if test "$CC" = "gcc"; then
+    EXTRA_CFLAGS="-Wall"
+    if test "$ENABLE_DEBUG" = "yes"; then
+        EXTRA_CFLAGS+=" -g"
+        DEBUG_DEFS="-DMOD_PSGI_DEBUG"
+        AC_SUBST(DEBUG_DEFS)
+    fi
+    AC_SUBST(EXTRA_CFLAGS)
+fi
+
 AC_OUTPUT([Makefile t/Config.pm])
 
 echo "

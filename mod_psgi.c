@@ -58,7 +58,7 @@
 
 #define PSGI_HANDLER_NAME "psgi"
 
-#ifdef DEBUG
+#ifdef MOD_PSGI_DEBUG
 #define TRACE(...) ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 0, NULL, __VA_ARGS__)
 #endif
 
