@@ -71,9 +71,7 @@ typedef struct {
 
 static PerlInterpreter *perlinterp = NULL;
 
-static apr_hash_t *app_mapping = NULL;
-
-static apr_array_header_t *psgi_apps = NULL;
+static apr_hash_t *psgi_apps = NULL;
 
 static void server_error(request_rec *r, const char *fmt, ...)
 {
@@ -623,7 +621,7 @@ static int psgi_handler(request_rec *r)
     ENTER;
     SAVETMPS;
 
-    app = apr_hash_get(app_mapping, c->file, APR_HASH_KEY_STRING);
+    app = apr_hash_get(psgi_apps, c->file, APR_HASH_KEY_STRING);
     if (app == NULL) {
         app = load_psgi(r->pool, c->file);
         if (app == NULL) {
@@ -631,7 +629,7 @@ static int psgi_handler(request_rec *r)
             rc = HTTP_INTERNAL_SERVER_ERROR;
             goto exit;
         }
-        apr_hash_set(app_mapping, c->file, APR_HASH_KEY_STRING, app);
+        apr_hash_set(psgi_apps, c->file, APR_HASH_KEY_STRING, app);
     }
 
     env = make_env(r, c);
@@ -691,9 +689,10 @@ static int
 psgi_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s)
 {
     dTHX;
-    int i;
-    char *file, **elts;
+    const void *key;
+    char *file;
     SV *app;
+    apr_hash_index_t *hi;
     void *data;
     const char *userdata_key = "psgi_post_config";
 
@@ -703,17 +702,17 @@ psgi_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_
                 apr_pool_cleanup_null, s->process->pool);
         return OK;
     }
-    app_mapping = apr_hash_make(pconf);
-    elts = (char **) psgi_apps->elts;
-    for (i = 0; i < psgi_apps->nelts; i++) {
-        file = elts[i];
+
+    for (hi = apr_hash_first(pconf, psgi_apps); hi; hi = apr_hash_next(hi)) {
+        apr_hash_this(hi, &key, NULL, NULL);
+        file = (char *) key;
         app = load_psgi(pconf, file);
         if (app == NULL) {
             ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL,
                     "%s had compilation errors.", file);
             return DONE;
         }
-        apr_hash_set(app_mapping, file, APR_HASH_KEY_STRING, app);
+        apr_hash_set(psgi_apps, file, APR_HASH_KEY_STRING, app);
     }
 
     ap_add_version_component(pconf, apr_psprintf(pconf, "mod_psgi/%s", MOD_PSGI_VERSION));
@@ -742,9 +741,9 @@ static const char *cmd_psgi_app(cmd_parms *cmd, void *conf, const char *v)
     psgi_dir_config *c = (psgi_dir_config *) conf;
     c->file = (char *) apr_pstrdup(cmd->pool, v);
     if (psgi_apps == NULL) {
-        psgi_apps = apr_array_make(cmd->pool, 10, sizeof(char *));
+        psgi_apps = apr_hash_make(cmd->pool);
     }
-    *(const char **) apr_array_push(psgi_apps) = c->file;
+    apr_hash_set(psgi_apps, c->file, APR_HASH_KEY_STRING, c->file);
     return NULL;
 }
 
