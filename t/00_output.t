@@ -21,6 +21,13 @@ BEGIN {
     }
 }
 
+{
+    package t::ModPSGIPath;
+    sub new { bless \my $s, $_[0] }
+    sub path { __FILE__ }
+    # no getline
+}
+
 return eval_response_app if running_in_mod_psgi;
 
 run_server_tests;
@@ -114,4 +121,18 @@ code: |
 --- response
 is_success: ok
 content: 123
+
+=== body has path
+--- request
+method: GET
+code: |
+  [ 200, [ 'Content-Type' => 'text/plain' ], t::ModPSGIPath->new ]
+--- response
+is_success: ok
+content: !perl/code |
+  {
+    require Path::Class;
+    my $file = Path::Class::file($0);
+    scalar $file->slurp;
+  }
 

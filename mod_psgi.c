@@ -25,6 +25,8 @@
 #include "util_script.h"
 #include "ap_config.h"
 #include "ap_mpm.h"
+#include "apr_file_io.h"
+#include "apr_file_info.h"
 #include "apr_buckets.h"
 #include "apr_strings.h"
 #include "apr_hash.h"
@@ -390,6 +392,70 @@ static int output_body_obj(request_rec *r, SV *obj, int type)
     return OK;
 }
 
+static int output_body_sendfile(request_rec *r, const char *path)
+{
+    apr_file_t *fd;
+    apr_status_t status;
+    apr_size_t len, nbytes;
+    apr_finfo_t finfo;
+    int rc;
+
+    status = apr_file_open(&fd, path, APR_READ|APR_BINARY, APR_OS_DEFAULT, r->pool);
+    if (status != APR_SUCCESS) {
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    apr_file_info_get(&finfo, APR_FINFO_NORM, fd);
+    len = finfo.size;
+
+    status = ap_send_fd(fd, r, 0, len, &nbytes);
+    apr_file_close(fd);
+
+    if (status == APR_SUCCESS) {
+        ap_set_content_length(r, nbytes);
+        rc = OK;
+    } else {
+        rc = HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    return rc;
+}
+
+static int output_body_path(request_rec *r, SV *body)
+{
+    dTHX;
+    int count;
+    apr_status_t rc;
+    SV *path_sv;
+    char *path;
+    dSP;
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+    XPUSHs(body);
+    PUTBACK;
+
+    count = call_method("path", G_EVAL|G_SCALAR|G_KEEPERR);
+    SPAGAIN;
+    if (SvTRUE(ERRSV)) {
+        rc = DECLINED;
+        server_error(r, "unable to get path\n%s", SvPV_nolen(ERRSV));
+        CLEAR_ERRSV();
+        POPs;
+    } else if (count > 0) {
+        path_sv = POPs;
+        path = apr_pstrdup(r->pool, SvPV_nolen(path_sv));
+        rc = OK;
+    } else {
+        rc = DECLINED;
+    }
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+
+    return rc != OK ? rc : output_body_sendfile(r, path);
+}
+
 static int output_body(request_rec *r, SV *body)
 {
     dTHX;
@@ -399,8 +465,17 @@ static int output_body(request_rec *r, SV *body)
             rc = output_body_ary(r, (AV *) SvRV(body));
             break;
         case SVt_PVGV:
+            /* TODO:
+             * It's possible to get fd by PerlIO_fileno(IoIFP(sv_2io(body)))
+             * It's possible to get apr_file_t by apr_os_file_put
+             * Is it possible to implement above portable?
+             */
             require_pv("IO/Handle.pm");
         case SVt_PVMG:
+            if (respond_to(body, "path")) {
+                rc = output_body_path(r, body);
+                if (rc != DECLINED) break;
+            }
             rc = output_body_obj(r, body, type);
             break;
         default:
