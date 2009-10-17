@@ -94,7 +94,7 @@ XS(ModPSGI_exit)
 {
     dXSARGS;
     croak("exit");
-    XSRETURN(0);
+    XSRETURN_UNDEF;
 }
 
 XS(ModPSGI_Input_read);
@@ -117,8 +117,7 @@ XS(ModPSGI_Input_read)
     }
 
     if (len <= 0) {
-        ST(0) = sv_2mortal(newSViv(0));
-        XSRETURN(1);
+        XSRETURN_IV(0);
     }
 
     bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
@@ -167,8 +166,7 @@ XS(ModPSGI_Input_read)
 
     apr_brigade_destroy(bb);
     sv_setpvn(buf, pv, nread);
-    ST(0) = sv_2mortal(newSViv(nread));
-    XSRETURN(1);
+    XSRETURN_IV(nread);
 }
 
 XS(ModPSGI_Errors_print);
@@ -180,8 +178,7 @@ XS(ModPSGI_Errors_print)
     dXSTARG;
     request_rec *r = (request_rec *) mg_find(SvRV(self), PERL_MAGIC_ext)->mg_obj;
     ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r->server, "%s", SvPV_nolen(msg));
-    ST(0) = newSViv(1);
-    XSRETURN(1);
+    XSRETURN_IV(1);
 }
 
 EXTERN_C void
