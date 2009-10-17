@@ -31,10 +31,6 @@
 #include "apr_strings.h"
 #include "apr_hash.h"
 
-#ifndef CLEAR_ERRSV /* should support in ppport.h ? */
-#define CLEAR_ERRSV() STMT_START { sv_setpvn(ERRSV,"",0); if (SvMAGICAL(ERRSV)) { mg_free(ERRSV); } SvPOK_only(ERRSV); } STMT_END
-#endif /* CLEAR_ERRSV */
-
 #ifdef _WIN32
 /* use perl's uid_t/gid_t. disable apr's macros. */
 #undef uid_t
@@ -49,6 +45,10 @@
 #define NEED_newRV_noinc
 #define NEED_sv_2pv_flags
 #include "ppport.h"
+
+#ifndef CLEAR_ERRSV /* should support in ppport.h ? */
+#define CLEAR_ERRSV() STMT_START { sv_setpvn(ERRSV,"",0); if (SvMAGICAL(ERRSV)) { mg_free(ERRSV); } SvPOK_only(ERRSV); } STMT_END
+#endif /* CLEAR_ERRSV */
 
 #ifdef _WIN32
 /* no use perl compatible macros. it break apr's structure. ex: bucket->link */
