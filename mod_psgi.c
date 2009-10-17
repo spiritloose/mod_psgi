@@ -105,43 +105,69 @@ XS(ModPSGI_Input_read)
     SV *buf = ST(1);
     request_rec *r = (request_rec *) mg_find(SvRV(self), PERL_MAGIC_ext)->mg_obj;
     apr_size_t len = SvIV(ST(2));
-    apr_status_t rv;
     apr_bucket_brigade *bb;
     apr_bucket *bucket;
+    apr_size_t nread = 0;
+    char *pv, *tmp;
     int eos = 0;
-    SV *ret;
     dXSTARG;
 
     if (items >= 4) {
         croak("$env->{'psgi.input'}->read: mod_psgi can't handle offset");
     }
 
-    ret = newSVpv("", 0);
-    bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
-    rv = ap_get_brigade(r->input_filters, bb, AP_MODE_READBYTES, APR_BLOCK_READ, len);
-    if (rv != APR_SUCCESS) {
-        ST(0) = &PL_sv_undef;
+    if (len <= 0) {
+        ST(0) = sv_2mortal(newSViv(0));
         XSRETURN(1);
     }
 
-    for (bucket = APR_BRIGADE_FIRST(bb);
-            bucket != APR_BRIGADE_SENTINEL(bb);
-            bucket = APR_BUCKET_NEXT(bucket)) {
-        const char *bbuf;
-        apr_size_t blen;
-        if (APR_BUCKET_IS_EOS(bucket)) {
-            eos = 1;
-            break;
-        }
-        if (APR_BUCKET_IS_METADATA(bucket)) {
-            continue;
-        }
-        apr_bucket_read(bucket, &bbuf, &blen, APR_BLOCK_READ);
-        sv_catpvn(ret, bbuf, blen);
+    bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
+    if (bb == NULL) {
+        server_error(r, "apr_brigade_create() failed");
+        XSRETURN_UNDEF;
     }
 
-    sv_setsv(buf, ret);
-    ST(0) = sv_2mortal(newSViv(SvCUR(buf)));
+    pv = apr_pcalloc(r->pool, len);
+    tmp = pv;
+
+    do {
+        apr_size_t read;
+        apr_status_t rc;
+
+        rc = ap_get_brigade(r->input_filters, bb, AP_MODE_READBYTES, APR_BLOCK_READ, len);
+        if (rc != APR_SUCCESS) {
+            apr_brigade_destroy(bb);
+            server_error(r, "ap_get_brigade() failed");
+            XSRETURN_UNDEF;
+        }
+
+        if (APR_BRIGADE_EMPTY(bb)) {
+            apr_brigade_destroy(bb);
+            server_error(r, "APR_BRIGADE_EMPTY");
+            XSRETURN_UNDEF;
+        }
+
+        if (APR_BUCKET_IS_EOS(APR_BRIGADE_LAST(bb))) {
+            eos = 1;
+        }
+
+        read = len;
+        rc = apr_brigade_flatten(bb, tmp, &read);
+        if (rc != APR_SUCCESS) {
+            apr_brigade_destroy(bb);
+            server_error(r, "apr_brigade_flatten() failed");
+            XSRETURN_UNDEF;
+        }
+
+        nread += read;
+        tmp   += read;
+        len   -= read;
+        apr_brigade_cleanup(bb);
+    } while (len > 0 && !eos);
+
+    apr_brigade_destroy(bb);
+    sv_setpvn(buf, pv, nread);
+    ST(0) = sv_2mortal(newSViv(nread));
     XSRETURN(1);
 }
 
