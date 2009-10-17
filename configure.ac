@@ -40,7 +40,7 @@ if test "$PERL" = no; then
 fi
 AC_SUBST(PERL)
 
-PERL_CCOPTS=`$PERL -MExtUtils::Embed -e ccopts`
+PERL_CCOPTS=`$PERL -MExtUtils::Embed -e ccopts | sed -e 's/-D_FILE_OFFSET_BITS=64//'`
 PERL_LDOPTS=`$PERL -MExtUtils::Embed -e ldopts`
 AC_SUBST(PERL_CCOPTS)
 AC_SUBST(PERL_LDOPTS)
