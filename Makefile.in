@@ -5,6 +5,7 @@ APXS=@APXS@
 APACHECTL=@APACHECTL@
 PERL=@PERL@
 
+PROVE=prove
 TESTS=t
 
 builddir=.
@@ -41,7 +42,7 @@ ppport.h:
 	$(PERL) -MDevel::PPPort -e 'Devel::PPPort::WriteFile'
 
 test: .libs/mod_psgi.so
-	prove $(TESTS)
+	$(PROVE) $(TESTS)
 
 reload: install restart
 
