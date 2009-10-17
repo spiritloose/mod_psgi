@@ -54,7 +54,7 @@ eval `$AP_LIBTOOL --config | grep "^CC"`
 if test "$CC" = "gcc"; then
     EXTRA_CFLAGS="-Wall"
     if test "$ENABLE_DEBUG" = "yes"; then
-        EXTRA_CFLAGS+=" -g"
+        EXTRA_CFLAGS+=" -O0 -g"
         DEBUG_DEFS="-DMOD_PSGI_DEBUG"
         AC_SUBST(DEBUG_DEFS)
     fi
