@@ -414,8 +414,8 @@ static int output_body_obj(request_rec *r, SV *obj, int type)
             break;
         }
     }
-    if (len > 0) {
-        ap_set_content_length(r, len);
+    if (clen > 0) {
+        ap_set_content_length(r, clen);
     }
     PUSHMARK(SP);
     XPUSHs(obj);
