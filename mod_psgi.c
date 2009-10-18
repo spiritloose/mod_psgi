@@ -654,7 +654,7 @@ exit:
 
 static apr_status_t psgi_child_exit(void *p)
 {
-    if (perlinterp == NULL) {
+    if (perlinterp != NULL) {
         PERL_SET_CONTEXT(perlinterp);
         PL_perl_destruct_level = 1;
         perl_destruct(perlinterp);
