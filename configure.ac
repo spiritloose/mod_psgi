@@ -45,6 +45,17 @@ PERL_LDOPTS=`$PERL -MExtUtils::Embed -e ldopts`
 AC_SUBST(PERL_CCOPTS)
 AC_SUBST(PERL_LDOPTS)
 
+AC_ARG_WITH(prove, AC_HELP_STRING([--with-prove=NAME],
+            [name of the prove executable [[prove]]]),
+            [PROVE="$with_prove"])
+if test -z "${PROVE}"; then
+    AC_PATH_PROG(PROVE, prove, no, [$PATH])
+fi
+if test "$PROVE" = no; then
+    PROVE="prove"
+fi
+AC_SUBST(PROVE)
+
 AC_ARG_ENABLE(debug, AC_HELP_STRING([--enable-debug],
             [enable debug mode]),
             [ENABLE_DEBUG="$enable_debug"],

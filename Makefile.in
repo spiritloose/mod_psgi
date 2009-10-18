@@ -5,7 +5,7 @@ APXS=@APXS@
 APACHECTL=@APACHECTL@
 PERL=@PERL@
 
-PROVE=prove
+PROVE=@PROVE@
 TESTS=t
 
 builddir=.
