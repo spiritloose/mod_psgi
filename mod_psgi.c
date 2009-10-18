@@ -73,6 +73,10 @@ static PerlInterpreter *perlinterp = NULL;
 
 static apr_hash_t *psgi_apps = NULL;
 
+static int psgi_multiprocess = 0;
+
+static int psgi_multithread = 0;
+
 static void server_error(request_rec *r, const char *fmt, ...)
 {
     va_list argp;
@@ -250,9 +254,9 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
     sv_bless(errors, gv_stashpv("ModPSGI::Errors", 1));
     (void) hv_store(env, "psgi.errors", 11, errors, 0);
 
-    (void) hv_store(env, "psgi.multithread", 16, newSViv(0), 0);
-    (void) hv_store(env, "psgi.multiprocess", 17, newSViv(1), 0);
-    (void) hv_store(env, "psgi.run_once", 13, newSViv(1), 0);
+    (void) hv_store(env, "psgi.multithread", 16, newSViv(psgi_multithread), 0);
+    (void) hv_store(env, "psgi.multiprocess", 17, newSViv(psgi_multiprocess), 0);
+    (void) hv_store(env, "psgi.run_once", 13, newSViv(0), 0);
     (void) hv_store(env, "psgi.nonblocking", 16, newSViv(0), 0);
 
     return newRV_inc((SV *) env);
@@ -681,6 +685,12 @@ psgi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp)
     PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
     perl_run(perlinterp);
     init_perl_variables();
+
+    ap_mpm_query(AP_MPMQ_IS_THREADED, &psgi_multithread);
+    psgi_multithread = (psgi_multithread != AP_MPMQ_NOT_SUPPORTED);
+
+    ap_mpm_query(AP_MPMQ_IS_FORKED, &psgi_multiprocess);
+    psgi_multiprocess = (psgi_multiprocess != AP_MPMQ_NOT_SUPPORTED);
 
     return OK;
 }
