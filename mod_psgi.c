@@ -692,6 +692,8 @@ psgi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp)
     ap_mpm_query(AP_MPMQ_IS_FORKED, &psgi_multiprocess);
     psgi_multiprocess = (psgi_multiprocess != AP_MPMQ_NOT_SUPPORTED);
 
+    psgi_apps = apr_hash_make(pconf);
+
     return OK;
 }
 
@@ -750,9 +752,6 @@ static const char *cmd_psgi_app(cmd_parms *cmd, void *conf, const char *v)
 {
     psgi_dir_config *c = (psgi_dir_config *) conf;
     c->file = (char *) apr_pstrdup(cmd->pool, v);
-    if (psgi_apps == NULL) {
-        psgi_apps = apr_hash_make(cmd->pool);
-    }
     apr_hash_set(psgi_apps, c->file, APR_HASH_KEY_STRING, c->file);
     return NULL;
 }
