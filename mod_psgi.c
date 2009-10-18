@@ -237,7 +237,7 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
     version = newAV();
     av_push(version, newSViv(1));
     av_push(version, newSViv(0));
-    (void) hv_store(env, "psgi.version", 12, newRV_inc((SV *) version), 0);
+    (void) hv_store(env, "psgi.version", 12, newRV_noinc((SV *) version), 0);
 
     url_scheme = apr_table_get(r->subprocess_env, "HTTPS") == NULL ?  "http" : "https";
     (void) hv_store(env, "psgi.url_scheme", 15, newSVpv(url_scheme, 0), 0);
