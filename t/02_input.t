@@ -66,3 +66,26 @@ args:
 is_success: ok
 content: foo=bar
 
+=== read offset 0
+--- request
+method: POST
+code: |
+  $env->{'psgi.input'}->read(my $buf, 1, 0);
+  $buf;
+args:
+  - foo: bar
+--- response
+is_success: ok
+content: f
+
+=== read offset 1
+--- request
+method: POST
+code: |
+  $env->{'psgi.input'}->read(my $buf, 1, 1);
+  $buf;
+args:
+  - foo: bar
+--- response
+is_success: not ok
+
