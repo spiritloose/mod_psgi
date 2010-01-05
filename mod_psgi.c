@@ -108,12 +108,13 @@ XS(ModPSGI_Input_read)
     SV *buf = ST(1);
     request_rec *r = (request_rec *) mg_find(SvRV(self), PERL_MAGIC_ext)->mg_obj;
     apr_size_t len = SvIV(ST(2));
+    int offset = items >= 4 ? SvIV(ST(3)) : 0;
     apr_bucket_brigade *bb;
     apr_size_t nread = 0;
     char *pv, *tmp;
     int eos = 0;
 
-    if (items >= 4) {
+    if (offset > 0) {
         croak("$env->{'psgi.input'}->read: mod_psgi can't handle offset");
     }
 
