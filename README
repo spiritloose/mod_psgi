@@ -43,6 +43,8 @@ Then after restarting Apache via
     $ vim /etc/apache2/mods-available/mod_psgi.load
     LoadModule psgi_module modules/mod_psgi.so
 
+    $ cd /etc/apache2/mods-enabled/ && ln -s ../mods-available/mod_psgi.load .
+
     $ sudo /etc/init.d/apache2 restart
 
     Done
