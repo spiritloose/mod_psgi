@@ -27,6 +27,27 @@ Then after restarting Apache via
 
     $ apachectl restart
 
+* Install on Debian/Ubuntu linux system
+
+    apache2-threaded-dev or apache2-prefork-dev is required.
+
+    $ autoscan .
+    $ autoconf
+    $ ./configure --with-apxs=/usr/bin/apxs2 \
+            --with-apachectl=/usr/sbin/apachectl \
+            --with-perl=/usr/bin/perl
+    $ sudo make install
+
+    Let apache2 to load mod_psgi module:
+
+    $ vim /etc/apache2/mods-available/mod_psgi.load
+    LoadModule psgi_module modules/mod_psgi.so
+
+    $ sudo /etc/init.d/apache2 restart
+
+    Done
+
+
 * Spec
 
     * PSGIApp files are loaded by 'do $file' at the time of startup parent process.
