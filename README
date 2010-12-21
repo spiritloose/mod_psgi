@@ -17,7 +17,7 @@ Then activate it in Apache's httpd.conf file for instance
 for the URL /psgi in as follows:
 
     # httpd.conf
-    LoadModule psgi_module modules/mod_psgi.so
+    LoadModule psgi_module /usr/lib/apache2/modules/mod_psgi.so
     <Location /psgi>
       SetHandler psgi
       PSGIApp /path/to/app.psgi
