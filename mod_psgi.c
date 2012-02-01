@@ -69,9 +69,16 @@ typedef struct {
     char *location;
 } psgi_dir_config;
 
-static PerlInterpreter *perlinterp = NULL;
+typedef struct {
+    apr_hash_t *apps;
+} psgi_apps_t;
 
-static apr_hash_t *psgi_apps = NULL;
+static apr_shm_t *psgi_shm = NULL;
+static char *shm_name = NULL;
+static apr_global_mutex_t *psgi_mutex = NULL;
+static char *mutex_name = NULL;
+
+static PerlInterpreter *perlinterp = NULL;
 
 static int psgi_multiprocess = 0;
 
@@ -611,10 +618,22 @@ static int psgi_handler(request_rec *r)
     SV *app, *env, *res;
     psgi_dir_config *c;
     int rc;
+    psgi_apps_t *psgi_apps;
+    int locked = 0;
 
     if (strcmp(r->handler, PSGI_HANDLER_NAME)) {
         return DECLINED;
     }
+
+    rc = apr_global_mutex_lock(psgi_mutex);
+    if (rc != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 0, r->server,
+                "apr_global_mutex_lock() failed");
+        rc = HTTP_INTERNAL_SERVER_ERROR;
+        goto exit;
+    }
+    locked = 1;
+
     c = (psgi_dir_config *) ap_get_module_config(r->per_dir_config, &psgi_module);
     if (c->file == NULL) {
         ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_NOTICE, 0, r->server,
@@ -626,7 +645,9 @@ static int psgi_handler(request_rec *r)
     ENTER;
     SAVETMPS;
 
-    app = apr_hash_get(psgi_apps, c->file, APR_HASH_KEY_STRING);
+    psgi_apps = (psgi_apps_t *)apr_shm_baseaddr_get(psgi_shm);
+
+    app = apr_hash_get(psgi_apps->apps, c->file, APR_HASH_KEY_STRING);
     if (app == NULL) {
         app = load_psgi(r->pool, c->file);
         if (app == NULL) {
@@ -634,7 +655,8 @@ static int psgi_handler(request_rec *r)
             rc = HTTP_INTERNAL_SERVER_ERROR;
             goto exit;
         }
-        apr_hash_set(psgi_apps, c->file, APR_HASH_KEY_STRING, app);
+        SvREFCNT_inc(app);
+        apr_hash_set(psgi_apps->apps, c->file, APR_HASH_KEY_STRING, app);
     }
 
     env = make_env(r, c);
@@ -648,6 +670,10 @@ static int psgi_handler(request_rec *r)
     SvREFCNT_dec(res);
 
 exit:
+    if (locked) {
+        apr_global_mutex_unlock(psgi_mutex);
+    }
+
     FREETMPS;
     LEAVE;
     return rc;
@@ -663,11 +689,13 @@ static apr_status_t psgi_child_exit(void *p)
         PERL_SYS_TERM();
         perlinterp = NULL;
     }
+
     return OK;
 }
 
 static void psgi_child_init(apr_pool_t *p, server_rec *s)
 {
+    apr_global_mutex_child_init(&psgi_mutex, (const char *) mutex_name, p);
     apr_pool_cleanup_register(p, NULL, psgi_child_exit, psgi_child_exit);
 }
 
@@ -693,8 +721,6 @@ psgi_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp)
     ap_mpm_query(AP_MPMQ_IS_FORKED, &psgi_multiprocess);
     psgi_multiprocess = (psgi_multiprocess != AP_MPMQ_NOT_SUPPORTED);
 
-    psgi_apps = apr_hash_make(pconf);
-
     return OK;
 }
 
@@ -708,6 +734,8 @@ psgi_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_
     apr_hash_index_t *hi;
     void *data;
     const char *userdata_key = "psgi_post_config";
+    psgi_apps_t *psgi_apps = NULL;
+    apr_status_t rc;
 
     apr_pool_userdata_get(&data, userdata_key, s->process->pool);
     if (data == NULL) {
@@ -716,19 +744,31 @@ psgi_post_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptemp, server_
         return OK;
     }
 
-    for (hi = apr_hash_first(pconf, psgi_apps); hi; hi = apr_hash_next(hi)) {
-        apr_hash_this(hi, &key, NULL, NULL);
-        file = (char *) key;
-        app = load_psgi(pconf, file);
-        if (app == NULL) {
-            ap_log_error(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, NULL,
-                    "%s had compilation errors.", file);
-            return DONE;
-        }
-        apr_hash_set(psgi_apps, file, APR_HASH_KEY_STRING, app);
+    ap_add_version_component(pconf, apr_psprintf(pconf, "mod_psgi/%s", MOD_PSGI_VERSION));
+
+    mutex_name = apr_psprintf(pconf, "/tmp/psgi_mutex.%ld", (long int) getpid());
+    rc = apr_global_mutex_create(&psgi_mutex,
+                        (const char *) mutex_name, APR_LOCK_DEFAULT, pconf);
+    if (rc != APR_SUCCESS) {
+        return DECLINED;
+    }
+    rc = apr_global_mutex_lock(psgi_mutex);
+    if (rc != APR_SUCCESS) {
+        return DECLINED;
     }
 
-    ap_add_version_component(pconf, apr_psprintf(pconf, "mod_psgi/%s", MOD_PSGI_VERSION));
+    /* shared name to store apps */
+    shm_name = apr_pstrdup(pconf, "/tmp/psgi_shm");
+    rc = apr_shm_attach(&psgi_shm, (const char *) shm_name, pconf);
+    if (rc != APR_SUCCESS) {
+        rc = apr_shm_create(&psgi_shm, sizeof(psgi_apps_t),
+                        (const char *) shm_name, pconf);
+    }
+    if (rc == APR_SUCCESS) {
+        psgi_apps = (psgi_apps_t *)apr_shm_baseaddr_get(psgi_shm);
+        psgi_apps->apps = apr_hash_make(pconf);
+    }
+    apr_global_mutex_unlock(psgi_mutex);
 
     return OK;
 }
@@ -753,7 +793,6 @@ static const char *cmd_psgi_app(cmd_parms *cmd, void *conf, const char *v)
 {
     psgi_dir_config *c = (psgi_dir_config *) conf;
     c->file = (char *) apr_pstrdup(cmd->pool, v);
-    apr_hash_set(psgi_apps, c->file, APR_HASH_KEY_STRING, c->file);
     return NULL;
 }
 
