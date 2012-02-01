@@ -1,6 +1,6 @@
 MOD_PSGI_VERSION=0.0.1
 APACHE_ROOT=c:/progra~1/apache~1/apache2.2
-PERL_ROOT=c:/perl
+PERL_ROOT=c:/strawberry/perl
 
 all : mod_psgi.so
 
@@ -8,7 +8,7 @@ mod_psgi.obj : mod_psgi.c ppport.h
 	cl /MD /c mod_psgi.c -DMP_SYS_DL_DLOPEN=1 -DNDEBUG -DWIN32 -DNO_STRICT -DHAVE_DES_FCRYPT -DUSE_SITECUSTOMIZE -DPRIVLIB_LAST_IN_INC -DPERL_IMPLICIT_CONTEXT -DPERL_IMPLICIT_SYS -DUSE_PERLIO -DPERL_MSVCRT_READFIX /I"$(PERL_ROOT)/lib/CORE" /I"$(APACHE_ROOT)/include" -DMOD_PSGI_VERSION=\"$(MOD_PSGI_VERSION)\"
 
 mod_psgi.so : mod_psgi.obj
-	link /DLL /OUT:mod_psgi.so mod_psgi.obj /LIBPATH:"$(APACHE_ROOT)/lib" "$(PERL_ROOT)/lib/core/perl510.lib" "$(APACHE_ROOT)/lib/libapr-1.lib" "$(APACHE_ROOT)/lib/libaprutil-1.lib" "$(APACHE_ROOT)/lib/libhttpd.lib"
+	link /DLL /OUT:mod_psgi.so mod_psgi.obj /LIBPATH:"$(APACHE_ROOT)/lib" "$(PERL_ROOT)/lib/core/libperl512.a" "$(APACHE_ROOT)/lib/libapr-1.lib" "$(APACHE_ROOT)/lib/libaprutil-1.lib" "$(APACHE_ROOT)/lib/libhttpd.lib"
 
 ppport.h :
 	perl -MDevel::PPPort -e "Devel::PPPort::WriteFile"
