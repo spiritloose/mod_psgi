@@ -57,7 +57,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-,root,root,-)
-%doc LICENCE README
+%doc LICENSE README
 %config(noreplace) %{_httpd_modconfdir}/*.conf
 %{_libdir}/httpd/modules/mod_psgi.so
 
