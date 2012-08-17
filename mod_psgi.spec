@@ -5,8 +5,8 @@
 %{!?_httpd_modconfdir: %{expand: %%global _httpd_modconfdir %%{_sysconfdir}/httpd/conf.d}}
 
 Name:           mod_psgi
-Version:        3.3
-Release:        7%{?dist}
+Version:        0.0.1
+Release:        1%{?dist}
 Summary:        A PSGI interface for Plack/Perl web applications in Apache
 
 Group:          System Environment/Libraries
