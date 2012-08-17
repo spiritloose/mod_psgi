@@ -19,6 +19,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires:  autoconf
 BuildRequires:  httpd-devel
 BuildRequires:  perl-devel
+BuildRequires:  perl(ExtUtils::Embed)
 Requires: httpd-mmn = %{_httpd_mmn}
 
 %description
