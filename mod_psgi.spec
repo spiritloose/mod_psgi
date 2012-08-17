@@ -16,6 +16,7 @@ Source0:        https://github.com/spiritloose/mod_psgi/downloads/%{name}-%{vers
 Source1:        psgi.conf
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+BuildRequires:  autoconf
 BuildRequires:  httpd-devel
 BuildRequires:  perl-devel
 Requires: httpd-mmn = %{_httpd_mmn}
@@ -32,6 +33,7 @@ existing PSGI adapters for mod_perl or CGI.
 %setup -q
 
 %build
+autoconf
 %configure --enable-shared --with-apxs=%{_httpd_apxs}
 make LDFLAGS="-L%{_libdir}" %{?_smp_mflags}
 
