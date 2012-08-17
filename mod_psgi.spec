@@ -35,7 +35,7 @@ existing PSGI adapters for mod_perl or CGI.
 
 %build
 autoconf
-%configure --enable-shared --with-apxs=%{_httpd_apxs}
+%configure --with-apxs=%{_httpd_apxs}
 make LDFLAGS="-L%{_libdir}" %{?_smp_mflags}
 
 
