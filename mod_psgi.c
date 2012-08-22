@@ -251,7 +251,7 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
 
     version = newAV();
     av_push(version, newSViv(1));
-    av_push(version, newSViv(0));
+    av_push(version, newSViv(1));
     (void) hv_store(env, "psgi.version", 12, newRV_noinc((SV *) version), 0);
 
     url_scheme = apr_table_get(r->subprocess_env, "HTTPS") == NULL ?  "http" : "https";
@@ -273,6 +273,7 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
     (void) hv_store(env, "psgi.multiprocess", 17, newSViv(psgi_multiprocess), 0);
     (void) hv_store(env, "psgi.run_once", 13, newSViv(0), 0);
     (void) hv_store(env, "psgi.nonblocking", 16, newSViv(0), 0);
+    (void) hv_store(env, "psgi.streaming", 14, newSViv(0), 0);
 
     return newRV_inc((SV *) env);
 }
