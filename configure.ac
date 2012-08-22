@@ -84,6 +84,7 @@ $PACKAGE_NAME $PACKAGE_VERSION configuration:
   apxs:              ${APXS}
   apachectl:         ${APACHECTL}
   perl:              ${PERL}
+  prove              ${PROVE}
 
 Now type 'make' to build $PACKAGE_NAME $PACKAGE_VERSION!
 "
