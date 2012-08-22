@@ -110,6 +110,7 @@ sub run_httpd($) {
     my $httpd = "$sbindir/$progname";
     my $topdir = $t::Config::ABS_TOP_BUILDDIR;
     my $conf = <<"END_CONF";
+ServerName mod-psgi.test
 LoadModule psgi_module $topdir/.libs/mod_psgi.so
 PidFile  $tmpdir/httpd.pid
 LockFile $tmpdir/httpd.lock
