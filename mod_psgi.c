@@ -212,6 +212,7 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
     HV *env;
     AV *version;
     char *url_scheme, *script_name, *vpath, *path_info;
+    const char *auth_hdr;
     SV *input, *errors;
 
     env = newHV();
@@ -232,6 +233,11 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
     path_info = &vpath[strlen(script_name)];
     apr_table_set(r->subprocess_env, "PATH_INFO", path_info);
     apr_table_set(r->subprocess_env, "SCRIPT_NAME", script_name);
+
+    /* ap_add_common_vars does not set HTTP_AUTHORIZATION */
+    if ((auth_hdr = apr_table_get(r->headers_in, "Authorization")) != NULL) {
+        apr_table_set(r->subprocess_env, "HTTP_AUTHORIZATION", auth_hdr);
+    }
 
     apr_table_do(copy_env, env, r->subprocess_env, NULL);
 
