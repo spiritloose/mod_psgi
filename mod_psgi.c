@@ -584,7 +584,7 @@ static void init_perl_variables()
 {
     dTHX;
     GV *exit_gv = gv_fetchpv("CORE::GLOBAL::exit", TRUE, SVt_PVCV);
-    GvCV(exit_gv) = get_cv("ModPSGI::exit", TRUE);
+    GvCV_set(exit_gv, get_cv("ModPSGI::exit", TRUE));
     GvIMPORTED_CV_on(exit_gv);
     (void) hv_store(GvHV(PL_envgv), "MOD_PSGI", 8, newSVpv(MOD_PSGI_VERSION, 0), 0);
 }
