@@ -206,12 +206,23 @@ static int copy_env(void *rec, const char *key, const char *val)
     return 1;
 }
 
+/* r->uri and r->path_info are unusable */
+static char *get_uri(request_rec *r)
+{
+    char *p;
+    char *uri = apr_pstrdup(r->pool, r->unparsed_uri);
+    p = strchr(uri, '?');
+    if (p != NULL) p[0] = '\0';
+    ap_unescape_url(uri);
+    return uri;
+}
+
 static SV *make_env(request_rec *r, psgi_dir_config *c)
 {
     dTHX;
     HV *env;
     AV *version;
-    char *url_scheme, *script_name, *vpath, *path_info;
+    char *uri, *url_scheme, *script_name, *path_info;
     const char *auth_hdr;
     SV *input, *errors;
 
@@ -226,11 +237,8 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
     } else {
         script_name = c->location;
     }
-    vpath = apr_pstrcat(r->pool,
-            apr_table_get(r->subprocess_env, "SCRIPT_NAME"),
-            apr_table_get(r->subprocess_env, "PATH_INFO"),
-            NULL);
-    path_info = &vpath[strlen(script_name)];
+    uri = get_uri(r);
+    path_info = &uri[strlen(script_name)];
     apr_table_set(r->subprocess_env, "PATH_INFO", path_info);
     apr_table_set(r->subprocess_env, "SCRIPT_NAME", script_name);
 
