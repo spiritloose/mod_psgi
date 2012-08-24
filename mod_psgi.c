@@ -206,12 +206,24 @@ static int copy_env(void *rec, const char *key, const char *val)
     return 1;
 }
 
+/* r->uri and r->path_info are unusable */
+static char *get_uri(request_rec *r)
+{
+    char *p;
+    char *uri = apr_pstrdup(r->pool, r->unparsed_uri);
+    p = strchr(uri, '?');
+    if (p != NULL) p[0] = '\0';
+    ap_unescape_url(uri);
+    return uri;
+}
+
 static SV *make_env(request_rec *r, psgi_dir_config *c)
 {
     dTHX;
     HV *env;
     AV *version;
-    char *url_scheme, *script_name, *vpath, *path_info;
+    char *uri, *url_scheme, *script_name, *path_info;
+    const char *auth_hdr;
     SV *input, *errors;
 
     env = newHV();
@@ -225,19 +237,21 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
     } else {
         script_name = c->location;
     }
-    vpath = apr_pstrcat(r->pool,
-            apr_table_get(r->subprocess_env, "SCRIPT_NAME"),
-            apr_table_get(r->subprocess_env, "PATH_INFO"),
-            NULL);
-    path_info = &vpath[strlen(script_name)];
+    uri = get_uri(r);
+    path_info = &uri[strlen(script_name)];
     apr_table_set(r->subprocess_env, "PATH_INFO", path_info);
     apr_table_set(r->subprocess_env, "SCRIPT_NAME", script_name);
+
+    /* ap_add_common_vars does not set HTTP_AUTHORIZATION */
+    if ((auth_hdr = apr_table_get(r->headers_in, "Authorization")) != NULL) {
+        apr_table_set(r->subprocess_env, "HTTP_AUTHORIZATION", auth_hdr);
+    }
 
     apr_table_do(copy_env, env, r->subprocess_env, NULL);
 
     version = newAV();
     av_push(version, newSViv(1));
-    av_push(version, newSViv(0));
+    av_push(version, newSViv(1));
     (void) hv_store(env, "psgi.version", 12, newRV_noinc((SV *) version), 0);
 
     url_scheme = apr_table_get(r->subprocess_env, "HTTPS") == NULL ?  "http" : "https";
@@ -259,6 +273,7 @@ static SV *make_env(request_rec *r, psgi_dir_config *c)
     (void) hv_store(env, "psgi.multiprocess", 17, newSViv(psgi_multiprocess), 0);
     (void) hv_store(env, "psgi.run_once", 13, newSViv(0), 0);
     (void) hv_store(env, "psgi.nonblocking", 16, newSViv(0), 0);
+    (void) hv_store(env, "psgi.streaming", 14, newSViv(0), 0);
 
     return newRV_inc((SV *) env);
 }
@@ -578,7 +593,7 @@ static void init_perl_variables()
 {
     dTHX;
     GV *exit_gv = gv_fetchpv("CORE::GLOBAL::exit", TRUE, SVt_PVCV);
-    GvCV(exit_gv) = get_cv("ModPSGI::exit", TRUE);
+    GvCV_set(exit_gv, get_cv("ModPSGI::exit", TRUE));
     GvIMPORTED_CV_on(exit_gv);
     (void) hv_store(GvHV(PL_envgv), "MOD_PSGI", 8, newSVpv(MOD_PSGI_VERSION, 0), 0);
 }

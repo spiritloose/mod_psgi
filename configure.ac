@@ -25,7 +25,7 @@ if test -z "${APACHECTL}"; then
     AC_PATH_PROGS(APACHECTL, apache2ctl apachectl, no, [$PATH:/usr/sbin:/usr/local/apache2/bin])
 fi
 if test "$APACHECTL" = no; then
-    AC_MSG_ERROR([apachectl not found. set apachectl with --with-apctl.])
+    AC_MSG_ERROR([apachectl not found. set apachectl with --with-apachectl.])
 fi
 AC_SUBST(APACHECTL)
 
@@ -84,6 +84,7 @@ $PACKAGE_NAME $PACKAGE_VERSION configuration:
   apxs:              ${APXS}
   apachectl:         ${APACHECTL}
   perl:              ${PERL}
+  prove              ${PROVE}
 
 Now type 'make' to build $PACKAGE_NAME $PACKAGE_VERSION!
 "
