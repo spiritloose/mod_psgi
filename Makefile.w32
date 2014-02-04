@@ -1,0 +1,14 @@
+MOD_PSGI_VERSION=0.0.1
+APACHE_ROOT=c:/progra~1/apache~1/apache2.2
+PERL_ROOT=c:/strawberry/perl
+
+all : mod_psgi.so
+
+mod_psgi.o : mod_psgi.c
+	gcc -g -shared -c mod_psgi.c -DMP_SYS_DL_DLOPEN=1 -MD -DNDEBUG -O1 -DWIN32 -DNO_STRICT -DHAVE_DES_FCRYPT -DUSE_SITECUSTOMIZE -DPRIVLIB_LAST_IN_INC -DPERL_IMPLICIT_CONTEXT -DPERL_IMPLICIT_SYS -DUSE_PERLIO -DPERL_MSVCRT_READFIX -I"$(PERL_ROOT)/lib/CORE" -I"$(APACHE_ROOT)/include" -DMOD_PSGI_VERSION=\"$(MOD_PSGI_VERSION)\"
+
+mod_psgi.so : mod_psgi.o
+	gcc -g -shared -o mod_psgi.so mod_psgi.o -L"$(APACHE_ROOT)/lib" -L"$(PERL_ROOT)/lib/core" -lperl512 -llibapr-1 -llibaprutil-1 -llibhttpd
+
+install :
+	cp mod_psgi.so "$(APACHE_ROOT)/modules/."
