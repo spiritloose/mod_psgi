@@ -112,8 +112,11 @@ sub run_httpd($) {
     my $conf = <<"END_CONF";
 ServerName mod-psgi.test
 LoadModule psgi_module $topdir/.libs/mod_psgi.so
+LoadModule mpm_event_module modules/mod_mpm_event.so
+LoadModule unixd_module modules/mod_unixd.so
+LoadModule authn_core_module modules/mod_authn_core.so
+LoadModule authz_core_module modules/mod_authz_core.so
 PidFile  $tmpdir/httpd.pid
-LockFile $tmpdir/httpd.lock
 ErrorLog $tmpdir/error_log
 Listen $port
 <Location />
