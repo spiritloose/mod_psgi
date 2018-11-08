@@ -44,7 +44,7 @@ content: f
 method: POST
 code: |
   $env->{'psgi.input'}->read(my $buf, $env->{CONTENT_LENGTH});
-  $buf;
+  join('&', sort split('&', $buf))
 args:
   - a: 1
     b: 2
