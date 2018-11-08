@@ -1,5 +1,6 @@
 use strict;
 use warnings;
+use lib '.';
 use t::TestModPSGI;
 
 return eval_body_app if running_in_mod_psgi;

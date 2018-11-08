@@ -2,6 +2,7 @@ use strict;
 use warnings;
 use Test::More;
 use Plack::Test::Suite;
+use lib '.';
 require t::TestModPSGI;
 
 BEGIN {
