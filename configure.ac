@@ -44,7 +44,7 @@ HAS_EXTUTILS_EMBED=`$PERL -MExtUtils::Embed -e 'print "yes"'`
 if test "$HAS_EXTUTILS_EMBED" != "yes"; then
     AC_MSG_ERROR([ExtUtils::Embed not found. Please install it.])
 fi
-PERL_CCOPTS=`$PERL -MExtUtils::Embed -e ccopts | sed -e 's/-D_FILE_OFFSET_BITS=64//'`
+PERL_CCOPTS=`$PERL -MExtUtils::Embed -e ccopts`
 PERL_LDOPTS=`$PERL -MExtUtils::Embed -e ldopts`
 AC_SUBST(PERL_CCOPTS)
 AC_SUBST(PERL_LDOPTS)
