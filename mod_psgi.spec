@@ -1,6 +1,6 @@
 Name:		mod_psgi
-Version:	0.0.0
-Release:	1%{?dist}
+Version:	0.0.1
+Release:	2%{?dist}
 Summary:	Perl PSGI modules for the Apache HTTP Server
 
 Group:		System Environment/Daemons
@@ -25,6 +25,11 @@ make %{?_smp_mflags}
 
 %install
 make install DESTDIR=%{buildroot}
+mkdir -p %{buildroot}/%{_sysconfdir}/httpd/conf.modules.d/
+cp 01-psgi.conf %{buildroot}/%{_sysconfdir}/httpd/conf.modules.d/
+
+%post
+service httpd reload
 
 %files
 %defattr(-,root,root)
