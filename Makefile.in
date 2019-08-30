@@ -51,12 +51,12 @@ stop:
 
 DIST_DIR=$(PACKAGE_NAME)-$(PACKAGE_VERSION)
 DIST_FILE=$(PACKAGE_NAME)-$(PACKAGE_VERSION).tar
-dist: ppport.h configure
+dist:	ppport.h configure 01-psgi.conf mod_psgi.spec
 	rm -f $(DIST_FILE)
 	git archive --format=tar --prefix=$(DIST_DIR)/ HEAD > $(DIST_FILE)
 	mkdir $(DIST_DIR)
-	cp ppport.h configure $(DIST_DIR)
-	tar rf $(DIST_FILE) $(DIST_DIR)/ppport.h $(DIST_DIR)/configure
+	cp ppport.h configure 01-psgi.conf mod_psgi.spec $(DIST_DIR)
+	tar rf $(DIST_FILE) $(DIST_DIR)/ppport.h $(DIST_DIR)/configure $(DIST_DIR)/01-psgi.conf $(DIST_DIR)/mod_psgi.spec
 	rm -fr $(DIST_DIR)
 	gzip --best $(DIST_FILE)
 
